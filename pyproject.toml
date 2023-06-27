@@ -31,6 +31,10 @@ ruff = "^0.0.275"
 [tool.poetry.group.cpu.dependencies]
 torch = {version = "^2.0.1+cpu", source = "torch-cpu"}
 
+
+[tool.poetry.group.examples.dependencies]
+mnist = "^0.2.2"
+
 [tool.poetry.scripts]
 lab = 'torch_lab.__main__:main'
 

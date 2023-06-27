@@ -1157,6 +1157,21 @@ files = [
 traitlets = "*"
 
 [[package]]
+name = "mnist"
+version = "0.2.2"
+description = "Python utilities to download and parse the MNIST dataset"
+category = "dev"
+optional = false
+python-versions = "*"
+files = [
+    {file = "mnist-0.2.2-py2.py3-none-any.whl", hash = "sha256:80e2b07992e5cc61e6247751ce8926f6d15ab3ebde1508d9bbc8891a766c7b91"},
+    {file = "mnist-0.2.2.tar.gz", hash = "sha256:24934fade9fbbd8adc98713ba805282e7e579224e888169bb5c8ab777efa7b54"},
+]
+
+[package.dependencies]
+numpy = "*"
+
+[[package]]
 name = "mpmath"
 version = "1.3.0"
 description = "Python library for arbitrary-precision floating-point arithmetic"
@@ -2335,4 +2350,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "db05989b7e527861cb658a084e05d787f407c19d8ad10560fd82940962984530"
+content-hash = "7170176efdf5132c55604f1363fa280cb285ac3e13555984974811099e8f3b63"
