@@ -29,6 +29,11 @@ black = "^23.3.0"
 ipdb = "^0.13.13"
 ruff = "^0.0.275"
 
+
+[tool.poetry.scripts]
+lab = 'torch_lab.__main__:main'
+
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
