@@ -4,7 +4,8 @@ from os import PathLike
 import pytorch_lightning as pl
 
 
-# TODO Add support for finetuning
+logger = logging.getLogger(__name__)
 
 def train(config_path: PathLike):
+    print(f"yo from train {config_path}")
     ...
