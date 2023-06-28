@@ -22,10 +22,10 @@ class TrainMixin:
         loss = self.calculate_loss(y_hat, y)
         return {"loss": loss, "preds": y_hat, "target": y}
 
-    def training_step_end(self, step_output: Dict[str, Tensor]):
-        self.update_metrics(step_output["preds"], step_output["target"])
+    def on_train_batch_end(self, output: Dict[str, Tensor], _batch, _batch_idx):
+        self.update_metrics(output["preds"], output["target"])
 
-    def on_training_epoch_end(self):
+    def on_train_epoch_end(self):
         self.compute_metrics()
 
 
@@ -36,8 +36,8 @@ class ValMixin:
         loss = self.calculate_loss(y_hat, y)
         return {"loss": loss, "preds": y_hat, "target": y}
 
-    def validation_step_end(self, step_output: Dict[str, Tensor]):
-        self.update_metrics(step_output["preds"], step_output["target"])
+    def on_validation_batch_end(self, output: Dict[str, Tensor], _batch, _batch_idx):
+        self.update_metrics(output["preds"], output["target"])
         # TODO Figure out outputs and output metrics
 
     def on_validation_epoch_end(self):
@@ -116,7 +116,7 @@ class LabModule(TrainMixin, ValMixin, pl.LightningModule):
     @torch.no_grad()
     def update_metrics(self, y_hat: torch.Tensor, y: torch.Tensor):
         stage = self.trainer.state.stage
-        metrics = getattr(self, f"{stage}_metrics")
+        metrics = getattr(self, f"metrics_{stage}")
 
         for metric_name, metric in metrics.items():
             metric.update(y_hat, y)

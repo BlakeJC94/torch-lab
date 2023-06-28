@@ -43,8 +43,8 @@ def train(config: PathLike, **kwargs):
 
     config = import_model_config(config)
 
-    # TODO Add standard callbacks
     # TODO Manage checkpoints
+    # IDEA: Could submit stats to ClearML using on_checkpoint hook?
 
     save_dir = ARTIFACTS_DIR / config.project / config.experiment_name
     save_dir.mkdir(exist_ok=True, parents=True)
@@ -56,5 +56,9 @@ def train(config: PathLike, **kwargs):
         default_hp_metric=False,
     )
 
-    trainer = pl.Trainer(**kwargs)
+    trainer = pl.Trainer(
+        logger=tensorboard_logger,
+        callbacks=config.callbacks,
+        **kwargs,
+    )
     trainer.fit(config.module, config.data_module)
