@@ -18,7 +18,7 @@ def import_model_config(config: Union[PathLike, Config]) -> Config:
         return config
     logger.debug(f"Importing config '{config}'...")
 
-    config_spec = spec_from_file_location("config", config)
+    config_spec = spec_from_file_location("configs", config)
     config_module = module_from_spec(config_spec)
     config_spec.loader.exec_module(config_module)
     try:
