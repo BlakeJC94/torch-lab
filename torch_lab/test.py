@@ -12,7 +12,7 @@ from .paths import import_model_config, ARTIFACTS_DIR
 logger = logging.getLogger(__name__)
 
 
-def test(config: PathLike, weights_path: Optional[PathLike] = None, **kwargs):
+def test(config: PathLike, weights_path: Optional[PathLike] = None, compile: bool = False, **kwargs):
     pl.seed_everything(0, workers=True)
 
     lab_config = import_model_config(config)
@@ -36,4 +36,9 @@ def test(config: PathLike, weights_path: Optional[PathLike] = None, **kwargs):
     if weights_path:
         lab_config.module.load_state_dict(torch.load(weights_path)['state_dict'])
 
-    trainer.test(lab_config.module, lab_config.data_module)
+    module = lab_config.module
+    data_module = lab_config.data_module
+    if compile:
+        module = torch.compile(module)
+
+    trainer.test(module, data_module)

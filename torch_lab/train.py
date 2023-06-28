@@ -2,15 +2,18 @@ import logging
 from os import PathLike
 
 import pytorch_lightning as pl
+import torch
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from .paths import import_model_config, ARTIFACTS_DIR
 
 
 logger = logging.getLogger(__name__)
+logging.getLogger("torch._dynamo").setLevel(logging.WARNING)
+logging.getLogger("torch._inductor").setLevel(logging.WARNING)
 
 
-def train(config: PathLike, **kwargs):
+def train(config: PathLike, compile: bool = False, **kwargs):
     pl.seed_everything(0, workers=True)
 
     lab_config = import_model_config(config)
@@ -33,4 +36,10 @@ def train(config: PathLike, **kwargs):
         callbacks=lab_config.callbacks,
         **kwargs,
     )
-    trainer.fit(lab_config.module, lab_config.data_module)
+
+    module = lab_config.module
+    data_module = lab_config.data_module
+    if compile:
+        module = torch.compile(module)
+
+    trainer.fit(module, data_module)
