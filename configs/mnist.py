@@ -4,6 +4,7 @@ from torch import nn, Tensor
 from torch.nn import functional as F
 from torch.utils.data import TensorDataset
 from torchmetrics import Accuracy
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 from torch_lab import Config, LabModule, LabDataModule
 
@@ -40,12 +41,26 @@ def main() -> Config:
         model=Classifier(),
         loss_function=nn.CrossEntropyLoss(),
         metrics={"Accuracy": Accuracy(task="multiclass", num_classes=10)},
-        optimizer_config=(torch.optim.Adam, {"lr": 0.0015, "weight_decay": 0.0001}),
+        optimizer_config=(torch.optim.Adam, dict(lr=0.0015, weight_decay=0.0001)),
     )
 
+    callbacks = [
+        EarlyStopping(
+            monitor="loss/validate",
+            min_delta=0.001,
+            patience=3,
+            verbose=True,
+            mode="min",
+        ),
+        ModelCheckpoint(
+            monitor="loss/validate",
+        ),
+    ]
+
     return Config(
+        project="examples",
+        experiment_name="MNIST",
         module=module,
         data_module=data_module,
-        project='examples',
-        experiment_name='MNIST',
+        callbacks=callbacks,
     )
