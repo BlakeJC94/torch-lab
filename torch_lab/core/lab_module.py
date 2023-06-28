@@ -4,7 +4,7 @@ from copy import deepcopy
 import pytorch_lightning as pl
 import torch
 from clearml import Logger
-from torch import nn
+from torch import nn, Tensor
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler as LRScheduler
 from torch.nn.modules.loss import _Loss as Loss
@@ -16,46 +16,32 @@ Stage = Literal["train", "val", "test", "predict"]
 
 
 class TrainMixin:
-    def training_step(self, batch, _batch_idx) -> Tuple[torch.Tensor, torch.Tensor]:
+    def training_step(self, batch, _batch_idx) -> Dict[str, Tensor]:
         x, y, *_md_batch = batch
         y_hat = self.model(x)
-        return y_hat, y
+        loss = self.calculate_loss(y_hat, y)
+        return {"loss": loss, "preds": y_hat, "target": y}
 
-    def training_step_end(
-        self,
-        step_output: Tuple[torch.Tensor, torch.Tensor],
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        y_hat, y = step_output
-        loss = self.calculate_loss(y_hat, y, "train")
-        self.update_metrics(y_hat, y, "train")
-        return {"loss": loss}
+    def training_step_end(self, step_output: Dict[str, Tensor]):
+        self.update_metrics(step_output["preds"], step_output["target"])
 
-    def training_epoch_end(self, _outputs: List[Any]):
-        self.compute_and_log_metrics("train")
+    def on_training_epoch_end(self):
+        self.compute_metrics()
 
 
 class ValMixin:
-    def validation_step(self, batch, _batch_idx):
-        x, y, *md_batch = batch
+    def validation_step(self, batch, _batch_idx) -> Dict[str, Tensor]:
+        x, y, *_md_batch = batch
         y_hat = self.model(x)
-        return y_hat, y, md_batch
+        loss = self.calculate_loss(y_hat, y)
+        return {"loss": loss, "preds": y_hat, "target": y}
 
-    def validation_step_end(self, step_output):
-        y_hat, y, md_batch = step_output
-        loss = self.calculate_loss(y_hat, y, "val")
-        self.update_metrics(y_hat, y, "val")
-        step_output = {"loss": loss, "predictions": y_hat}
-        if md_batch:
-            md_batch = md_batch[0]
-            out_batch = self.calculate_outputs(y_hat, md_batch)
-            self.update_output_metrics(out_batch, md_batch, "val")
-            step_output["outputs"] = out_batch
-            step_output["metadata"] = md_batch
-        return step_output
+    def validation_step_end(self, step_output: Dict[str, Tensor]):
+        self.update_metrics(step_output["preds"], step_output["target"])
+        # TODO Figure out outputs and output metrics
 
-    def validation_epoch_end(self, outputs: List[Any]):
-        self.compute_metrics("val")
-        self.compute_output_metrics("val")
+    def on_validation_epoch_end(self):
+        self.compute_metrics()
 
 
 class LabModule(TrainMixin, ValMixin, pl.LightningModule):
@@ -67,7 +53,7 @@ class LabModule(TrainMixin, ValMixin, pl.LightningModule):
         scheduler_config: Optional[Tuple[LRScheduler, SchedulerKwargs]] = None,
         output_transforms: Optional[Callable] = None,
         metrics: Optional[Dict[str, Metric]] = None,
-        output_metrics: Optional[Dict[str, Metric]] = None,
+        # output_metrics: Optional[Dict[str, Metric]] = None,
         hyperparams_ignore: Optional[List[str]] = None,
     ):
         super().__init__()
@@ -87,35 +73,39 @@ class LabModule(TrainMixin, ValMixin, pl.LightningModule):
 
         self.output_transforms = output_transforms
 
-        self.train_metrics = metrics
-        self.val_metrics = deepcopy(metrics)
-        self.test_metrics = deepcopy(metrics)
+        self.metrics_train = metrics
+        self.metrics_sanity_check = deepcopy(metrics)
+        self.metrics_validate = deepcopy(metrics)
+        self.metrics_train = deepcopy(metrics)
 
-        self.val_output_metrics = output_metrics
-        self.test_output_metrics = deepcopy(output_metrics)
+        # self.output_metrics_validate = output_metrics
+        # self.output_metrics_test = deepcopy(output_metrics)
 
         self.hyperparams_ignore = hyperparams_ignore
         if hyperparams_ignore is None:
             hyperparams_ignore = []
+
         self.save_hyperparameters(
             ignore=["loss_function", "metrics", "model"] + hyperparams_ignore
         )
 
     def configure_optimizers(self):
-        optimizer = None
+        output = {}
+
         if self.optimizer_config is not None:
             optmizer_class, optmizer_kwargs = self.optimizer_config
-            optimizer = optmizer_class(self.parameters(), **optmizer_kwargs)
+            output["optimizer"] = optmizer_class(self.parameters(), **optmizer_kwargs)
 
-        scheduler = None
-        if optimizer is not None and self.scheduler_config is not None:
+        if "optimizer" in output and self.scheduler_config is not None:
             scheduler_class, scheduler_kwargs = self.scheduler_config
-            scheduler = scheduler_class(scheduler_class, **scheduler_kwargs)
+            output["lr_scheduler"] = scheduler_class(
+                output["optimizer"], **scheduler_kwargs
+            )
 
-        return dict(optimizer=optimizer, lr_scheduler=scheduler)
+        return output
 
-    def _log_metric(self, metric, name, stage, batch_size):
-        result = metric.compute() if isinstance(metric, Metric) else metric
+    def _log_result(self, result, name, batch_size):
+        stage = self.trainer.state.stage
         if isinstance(result, dict):
             # There's a log_dict method to use?
             for k, v in result.items():
@@ -124,18 +114,26 @@ class LabModule(TrainMixin, ValMixin, pl.LightningModule):
             self.log(f"{name}/{stage}", result, batch_size=batch_size)
 
     @torch.no_grad()
-    def update_metrics(self, y_hat: torch.Tensor, y: torch.Tensor, stage: Stage):
+    def update_metrics(self, y_hat: torch.Tensor, y: torch.Tensor):
+        stage = self.trainer.state.stage
         metrics = getattr(self, f"{stage}_metrics")
+
         for metric_name, metric in metrics.items():
             metric.update(y_hat, y)
+
             if getattr(metric, "compute_on_batch", True):
-                self._log_metric(metric, metric_name, stage, batch_size=len(y_hat))
+                result = metric.compute() if isinstance(metric, Metric) else metric
+                self._log_result(result, metric_name, batch_size=len(y_hat))
 
     @torch.no_grad()
-    def compute_metrics(self, y_hat: torch.Tensor, y: torch.Tensor, stage: Stage):
-        metrics = getattr(self, f"{stage}_metrics")
+    def compute_metrics(self):
+        stage = self.trainer.state.stage
+        metrics = getattr(self, f"metrics_{stage}")
+
         for metric_name, metric in metrics.items():
-            self._log_metric(metric, metric_name, stage)
+            result = metric.compute() if isinstance(metric, Metric) else metric
+            self._log_result(result, metric_name, batch_size=None)
+
             if (
                 hasattr(metric, "plot")
                 and (clearml_logger := Logger.current_logger()) is not None
@@ -146,3 +144,8 @@ class LabModule(TrainMixin, ValMixin, pl.LightningModule):
                     metric.plot(),
                     iteration=self.current_epoch,
                 )
+
+    def calculate_loss(self, y_hat: Tensor, y: Tensor) -> Tensor:
+        loss = self.loss_function(y_hat, y)
+        self._log_result(loss, "loss", batch_size=len(y_hat))
+        return loss
