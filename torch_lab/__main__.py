@@ -1,6 +1,6 @@
 import fire
 
-from . import train, build, __version__
+from . import train, test, build, __version__
 
 
 def main():
@@ -8,6 +8,7 @@ def main():
         dict(
             version=str(__version__),
             train=train,
+            test=test,
             build=build,
         )
     )

@@ -32,6 +32,7 @@ def main() -> Config:
     data_module = LabDataModule(
         train_dataset=TensorDataset(train_images, train_labels),
         val_dataset=TensorDataset(val_images, val_labels),
+        test_dataset=TensorDataset(val_images, val_labels),
         num_workers=8,
         batch_size_train=256,
         batch_size_test=256,

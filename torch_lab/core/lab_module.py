@@ -43,8 +43,23 @@ class ValMixin:
     def on_validation_epoch_end(self):
         self.compute_metrics()
 
+class TestMixin:
+    def test_step(self, batch, _batch_idx) -> Dict[str, Tensor]:
+        x, y, *_md_batch = batch
+        y_hat = self.model(x)
+        loss = self.calculate_loss(y_hat, y)
+        return {"loss": loss, "preds": y_hat, "target": y}
 
-class LabModule(TrainMixin, ValMixin, pl.LightningModule):
+    def on_test_batch_end(self, output: Dict[str, Tensor], _batch, _batch_idx):
+        self.update_metrics(output["preds"], output["target"])
+        # TODO Figure out outputs and output metrics
+
+    def on_test_epoch_end(self):
+        self.compute_metrics()
+
+
+
+class LabModule(TrainMixin, ValMixin, TestMixin, pl.LightningModule):
     def __init__(
         self,
         model: nn.Module,
@@ -76,7 +91,7 @@ class LabModule(TrainMixin, ValMixin, pl.LightningModule):
         self.metrics_train = metrics
         self.metrics_sanity_check = deepcopy(metrics)
         self.metrics_validate = deepcopy(metrics)
-        self.metrics_train = deepcopy(metrics)
+        self.metrics_test = deepcopy(metrics)
 
         # self.output_metrics_validate = output_metrics
         # self.output_metrics_test = deepcopy(output_metrics)
