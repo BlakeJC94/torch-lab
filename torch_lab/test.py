@@ -1,7 +1,9 @@
 import logging
 from os import PathLike
+from typing import Optional
 
 import pytorch_lightning as pl
+import torch
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from .paths import import_model_config, ARTIFACTS_DIR
@@ -10,13 +12,10 @@ from .paths import import_model_config, ARTIFACTS_DIR
 logger = logging.getLogger(__name__)
 
 
-def test(config: PathLike, **kwargs):
+def test(config: PathLike, weights_path: Optional[PathLike] = None, **kwargs):
     pl.seed_everything(0, workers=True)
 
     lab_config = import_model_config(config)
-
-    # TODO Manage checkpoints
-    # IDEA: Could submit stats to ClearML using on_checkpoint hook?
 
     save_dir = ARTIFACTS_DIR / lab_config.project / lab_config.experiment_name
     save_dir.mkdir(exist_ok=True, parents=True)
@@ -33,4 +32,8 @@ def test(config: PathLike, **kwargs):
         callbacks=lab_config.callbacks,
         **kwargs,
     )
+
+    if weights_path:
+        lab_config.module.load_state_dict(torch.load(weights_path)['state_dict'])
+
     trainer.test(lab_config.module, lab_config.data_module)
