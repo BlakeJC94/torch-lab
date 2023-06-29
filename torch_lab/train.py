@@ -13,7 +13,7 @@ logging.getLogger("torch._dynamo").setLevel(logging.WARNING)
 logging.getLogger("torch._inductor").setLevel(logging.WARNING)
 
 
-def train(config: PathLike, compile: bool = False, **kwargs):
+def train(config: PathLike, **kwargs):
     pl.seed_everything(0, workers=True)
 
     lab_config = import_model_config(config)
@@ -34,13 +34,8 @@ def train(config: PathLike, compile: bool = False, **kwargs):
     trainer = pl.Trainer(
         logger=tensorboard_logger,
         callbacks=lab_config.callbacks,
+        num_sanity_val_steps=0,
         **kwargs,
     )
 
-    module = lab_config.module
-    data_module = lab_config.data_module
-    # TODO: Re-enable this when lightning gets upgraded to 2.1, logger just isn't ready yet!
-    if compile:
-        module.model = torch.compile(module.model)
-
-    trainer.fit(module, data_module)
+    trainer.fit(lab_config.module, lab_config.data_module)

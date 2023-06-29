@@ -5,7 +5,9 @@ A place to experiment with ML frameworks with `Pytorch`, `Pytorch-lightning`, `T
 
 ## TODO
 
-* [ ] torch.compile support
+* [/] torch.compile support
+    * Should be applied config-side
+    * Couldn't get this wokring `torch==2.0.1+cpu`
 * [ ] Clearml integration
 * [ ] Support metadata output from datasets in loops
 

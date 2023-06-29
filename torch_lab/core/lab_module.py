@@ -37,6 +37,7 @@ class ValMixin:
         x, y, *_md_batch = batch
         y_hat = self.model(x)
         loss = self.calculate_loss(y_hat, y)
+        # logger.info(f"TRACE: Calculated validation step loss {loss}")
         return {"loss": loss, "preds": y_hat, "target": y}
 
     def on_validation_batch_end(self, output: Dict[str, Tensor], _batch, _batch_idx):
@@ -44,7 +45,9 @@ class ValMixin:
         # TODO Figure out outputs and output metrics
 
     def on_validation_epoch_end(self):
+        # logger.info(f"TRACE: {self.trainer.callback_metrics=}")
         self.compute_metrics()
+
 
 class TestMixin:
     def test_step(self, batch, _batch_idx) -> Dict[str, Tensor]:
@@ -59,7 +62,6 @@ class TestMixin:
 
     def on_test_epoch_end(self):
         self.compute_metrics()
-
 
 
 class LabModule(TrainMixin, ValMixin, TestMixin, pl.LightningModule):

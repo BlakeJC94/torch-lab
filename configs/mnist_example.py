@@ -65,6 +65,3 @@ def main() -> Config:
         data_module=data_module,
         callbacks=callbacks,
     )
-
-if __name__ == '__main__':
-    foo = main()
