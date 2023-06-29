@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, List, Optional, Tuple, Any, Callable, Literal
 from copy import deepcopy
 
@@ -13,6 +14,8 @@ from torchmetrics import Metric
 OptimizerKwargs = Dict[str, Any]
 SchedulerKwargs = Dict[str, Any]
 Stage = Literal["train", "val", "test", "predict"]
+
+logger = logging.getLogger(__name__)
 
 
 class TrainMixin:
@@ -121,12 +124,11 @@ class LabModule(TrainMixin, ValMixin, TestMixin, pl.LightningModule):
 
     def _log_result(self, result, name, batch_size):
         stage = self.trainer.state.stage
-        if isinstance(result, dict):
-            # There's a log_dict method to use?
-            for k, v in result.items():
-                self.log(f"{name} ({stage})/{k}", v, batch_size=batch_size)
-        elif result is not None:
-            self.log(f"{name}/{stage}", result, batch_size=batch_size)
+        if result is not None:
+            key = f"{name}/{stage}"
+            # if name == "loss" and (stage == "sanity_check" or stage == 'validate'):
+            #     logger.info(f"TRACE: {key=}, {result=}")
+            self.log(key, result, batch_size=batch_size)
 
     @torch.no_grad()
     def update_metrics(self, y_hat: torch.Tensor, y: torch.Tensor):

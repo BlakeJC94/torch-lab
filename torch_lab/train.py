@@ -39,7 +39,8 @@ def train(config: PathLike, compile: bool = False, **kwargs):
 
     module = lab_config.module
     data_module = lab_config.data_module
+    # TODO: Re-enable this when lightning gets upgraded to 2.1, logger just isn't ready yet!
     if compile:
-        module = torch.compile(module)
+        module.model = torch.compile(module.model)
 
     trainer.fit(module, data_module)
