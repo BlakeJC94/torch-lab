@@ -93,6 +93,7 @@ class LabModule(TrainMixin, ValMixin, TestMixin, pl.LightningModule):
 
         self.output_transforms = output_transforms
 
+        metrics = nn.ModuleDict(metrics or {})
         self.metrics_train = metrics
         self.metrics_sanity_check = deepcopy(metrics)
         self.metrics_validate = deepcopy(metrics)
@@ -108,6 +109,9 @@ class LabModule(TrainMixin, ValMixin, TestMixin, pl.LightningModule):
         self.save_hyperparameters(
             ignore=["loss_function", "metrics", "model"] + hyperparams_ignore
         )
+
+    def forward(self, *args, **kwargs):
+        return self.model(*args, **kwargs)
 
     def configure_optimizers(self):
         output = {}
