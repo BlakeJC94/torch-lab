@@ -29,8 +29,8 @@ black = "^23.3.0"
 ipdb = "^0.13.13"
 ruff = "^0.0.275"
 
-[tool.poetry.group.cpu.dependencies]
-torch = {version = "^2.0.1+cpu", source = "torch-cpu"}
+# [tool.poetry.group.cpu.dependencies]
+# torch = {version = "^2.0.1+cpu", source = "torch-cpu"}
 
 
 [tool.poetry.group.examples.dependencies]
