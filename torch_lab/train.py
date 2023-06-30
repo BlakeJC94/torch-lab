@@ -7,6 +7,13 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from .paths import import_model_config, ARTIFACTS_DIR
 
+# TODO
+# from clearml import Task
+# task = Task.init(project_name="my project", task_name="my task")
+
+
+
+
 
 logger = logging.getLogger(__name__)
 logging.getLogger("torch._dynamo").setLevel(logging.WARNING)
