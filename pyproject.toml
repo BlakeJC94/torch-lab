@@ -42,7 +42,7 @@ lab = 'torch_lab.__main__:main'
 [[tool.poetry.source]]
 name = "torch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
-priority = 'explicit'
+# priority = 'explicit'
 
 [build-system]
 requires = ["poetry-core"]

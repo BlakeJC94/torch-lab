@@ -59,9 +59,11 @@ def main() -> Config:
     ]
 
     return Config(
-        project="examples",
-        experiment_name="MNIST",
+        project_name="examples",
+        task_name="MNIST",
         module=module,
         data_module=data_module,
-        callbacks=callbacks,
+        train_callbacks=callbacks,
     )
+
+# IDEA: Write predict function in config!! torh--lab should just be for training and testing
