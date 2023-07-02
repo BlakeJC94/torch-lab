@@ -17,6 +17,7 @@ Stage = Literal["train", "val", "test", "predict"]
 
 logger = logging.getLogger(__name__)
 
+# TODO Add optimiser/scheduler kwargs as hparams
 
 class TrainMixin:
     def training_step(self, batch, _batch_idx) -> Dict[str, Tensor]:

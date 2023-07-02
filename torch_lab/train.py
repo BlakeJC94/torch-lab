@@ -1,5 +1,4 @@
 import logging
-import re
 from pathlib import Path
 from os import PathLike
 from typing import Optional, Union
@@ -9,7 +8,15 @@ from clearml import Task
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from torch_lab.core.config import Config
-
+from torch_lab.core.checkpoint import ClearmlModelCheckpoint
+from torch_lab.core.utils import (
+    verify_task_id,
+    get_checkpoint_from_task,
+    check_existing_tasks,
+    init_task,
+    connect_hparams_to_task,
+    get_config_from_task,
+)
 from .paths import import_model_config, ARTIFACTS_DIR
 
 # TODO
@@ -22,94 +29,64 @@ logging.getLogger("torch._inductor").setLevel(logging.WARNING)
 CLEARML_CONFIG_PATH = Path.home() / "clearml.conf"
 
 
-def get_prior_experiments(config: Config):
-    return Task.get_tasks(task_name=rf"^{config.task_name}$")  # Uses regex to search
-
-def verify_task_id(task_id: str):
-    if re.match(r"^[a-f0-9]{32}$", task_id) is None or not Task.get_task(task_id):
-        raise Exception("Invalid experiment_id")
-
-def setup_new_clearml_task(config, overwrite):
-    prior_experiments = get_prior_experiments(config)
-    if len(prior_experiments) > 0:
-        if not overwrite:
-            raise FileExistsError()
-        for exp in prior_experiments:
-            logger.info(f"Deleting experiment {exp.name}, ID: {exp.id}")
-            exp.delete(
-                delete_artifacts_and_models=True,
-                skip_models_used_by_other_tasks=True,
-                raise_on_error=True,
-            )
-    task = Task.init(project_name=config.project_name, task_name=config.task_name)
-    # TODO log parameters to ClearML
-    return task
-
-# def get_experiment_artifacts(task_id):
-#     model_config, task_path = None, None, None
-#     task = Task.get_task(task_id=task_id)
-#     task_path = ARTIFACTS_DIR / task.get_project_name() / f"{task.name}.{task.id}"
-
-#     # temp_config_path = download_config_from_clearml(experiment, save_dir)
-#     # model_config = import_model_config(temp_config_path)
-
-#     # weights_path = download_weights_from_clearml(
-#     #     experiment, best, task_path / "model_weights"
-#     # )
-
-#     ...
-
-def parse_config_and_experiment_id(config, task_id):
-    if not (config or task_id):
-        raise Exception("Must provide config and/or experiment_id.")
-    if task_id:
-        verify_task_id(task_id)
-    if config:
-        config = import_model_config(config)
-    return config, task_id
-
 def train(
-    config: Optional[Union[PathLike, Config]] = None,
+    config_path: Optional[Union[PathLike, Config]] = None,
+    config: Optional[Config] = None,
     task_id: Optional[str] = None,
     offline: bool = False,
     overwrite: bool = False,
-    **kwargs,
+    ckpt_monitor: str = "loss/validate",
+    ckpt_name: str = "last",
+    **trainer_kwargs,
 ):
+    cli_params = locals()
     pl.seed_everything(0, workers=True)
-    config, task_id = parse_config_and_experiment_id(config, task_id)
 
-    ckpt_path = None
-    if config:
+    if not CLEARML_CONFIG_PATH.exists():
+        raise FileNotFoundError("~/clearml.conf not found.")
+
+    config = import_model_config(config_path) if config_path else config
+    task_id = verify_task_id(task_id) if task_id else None
+    if not (config or task_id):
+        raise Exception("Must provide config and/or experiment_id.")
+
+    # Get ckpt for finetune/continue
+    ckpt_path, prior_task = None, None
+    if task_id:
+        prior_task = Task.get_task(task_id)
+        ckpt_dir = ARTIFACTS_DIR / f"{config.project_name}/{config.task_name}"
+        ckpt_path = get_checkpoint_from_task(prior_task, ckpt_name, ckpt_dir)
+
+    # Setup ClearML
+    task = None
+    if config:  # New or FineTune
         if not offline:
-            setup_new_clearml_task(config, overwrite)
-        if task_id:
-            raise NotImplementedError()
-            task.set_parent(task_id)
-            # TODO ckpt_path = setup_finetune_clearml_task(config, task_id, overwrite)
-    elif not config and task_id:  # Continue
-        raise NotImplementedError()
-        # TODO Get config from experiment_id
-        # TODO Get checkpoint
-    else:
-        raise Exception("NEVER REACHED")
-
-    # IDEA: Could submit stats to ClearML using on_checkpoint hook?
-
-    save_dir = ARTIFACTS_DIR / config.project_name / config.task_name
-    save_dir.mkdir(exist_ok=True, parents=True)
-    logs_path = save_dir / "logs"
+            check_existing_tasks(config, overwrite)
+            task = init_task(config)
+            task = connect_hparams_to_task(task, config, config_path, cli_params)
+    elif prior_task:  # Cont
+        config = get_config_from_task(prior_task)
+        if not offline:
+            task = init_task(config, prior_task_id=task_id)
 
     tensorboard_logger = TensorBoardLogger(
-        save_dir=str(logs_path),
-        name="",
+        save_dir=ARTIFACTS_DIR,
+        name=f"{config.project_name}/{config.task_name}",
         default_hp_metric=False,
     )
 
+    callbacks = config.callbacks.get("train", [])
+    if not offline:
+        callbacks.append(ClearmlModelCheckpoint(task=task, monitor=ckpt_monitor))
+
     trainer = pl.Trainer(
         logger=tensorboard_logger,
-        callbacks=config.train_callbacks,
-        num_sanity_val_steps=0,
-        **kwargs,
+        callbacks=callbacks,
+        **trainer_kwargs,
     )
 
-    trainer.fit(config.module, config.data_module, ckpt_path=ckpt_path)
+    trainer.fit(
+        config.module,
+        config.data_module,
+        ckpt_path=ckpt_path,
+    )

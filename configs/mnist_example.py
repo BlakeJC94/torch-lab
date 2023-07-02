@@ -6,7 +6,9 @@ from torch.utils.data import TensorDataset
 from torchmetrics import Accuracy
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
+
 from torch_lab import Config, LabModule, LabDataModule
+
 
 
 class Classifier(nn.Module):
@@ -45,25 +47,28 @@ def main() -> Config:
         optimizer_config=(torch.optim.Adam, dict(lr=0.0015, weight_decay=0.0001)),
     )
 
-    callbacks = [
-        EarlyStopping(
-            monitor="loss/validate",
-            min_delta=0.001,
-            patience=3,
-            verbose=True,
-            mode="min",
-        ),
-        ModelCheckpoint(
-            monitor="loss/validate",
-        ),
-    ]
+    callbacks = dict(
+        train=[
+            EarlyStopping(
+                monitor="loss/validate",
+                min_delta=0.001,
+                patience=3,
+                verbose=True,
+                mode="min",
+            ),
+            ModelCheckpoint(
+                monitor="loss/validate",
+            ),
+        ],
+    )
 
     return Config(
         project_name="examples",
         task_name="MNIST",
         module=module,
         data_module=data_module,
-        train_callbacks=callbacks,
+        callbacks=callbacks,
     )
+
 
 # IDEA: Write predict function in config!! torh--lab should just be for training and testing
