@@ -82,7 +82,6 @@ def connect_hparams_to_task(task, config, config_path, cli_params):
 
 def get_checkpoint_from_task(task_id, ckpt_name, ckpt_dir=None):
     task = Task.get_task(task_id=task_id)
-    ckpt_dir = ARTIFACTS_DIR / task.get_project_name() / task.name
     output_models = task.models["output"]
     selected_model = next((m for m in output_models if m.name == ckpt_name), None)
     if selected_model is None:
