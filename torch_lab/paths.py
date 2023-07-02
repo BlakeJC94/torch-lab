@@ -22,12 +22,12 @@ def import_model_config(config: Union[PathLike, Config]) -> Config:
     config_module = module_from_spec(config_spec)
     config_spec.loader.exec_module(config_module)
     try:
-        model_config = config_module.main()
+        model_config = config_module.config()
         assert isinstance(model_config, Config)
     except (ModuleNotFoundError, AssertionError, AttributeError):
         # pylint: disable=raise-missing-from
         raise AttributeError(
-            "Config file must define function `main()` that returns a `Config`."
+            "Config file must define function `config()` that returns a `torch_lab.Config`."
         )
     logger.debug("Done.")
     return model_config

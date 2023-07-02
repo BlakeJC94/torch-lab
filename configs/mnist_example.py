@@ -25,7 +25,7 @@ class Classifier(nn.Module):
         return x
 
 
-def main() -> Config:
+def config() -> Config:
     train_images = torch.as_tensor(mnist.train_images()).float() / 255
     train_labels = torch.as_tensor(mnist.train_labels()).long()
     val_images = torch.as_tensor(mnist.test_images()).float() / 255
