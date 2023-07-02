@@ -21,6 +21,8 @@ plotly = "^5.15.0"
 matplotlib = "^3.7.1"
 clearml = "^1.11.1"
 tensorboard = "^2.13.0"
+torchvision = "^0.15.2"
+torchaudio = "^2.0.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
@@ -42,7 +44,7 @@ lab = 'torch_lab.__main__:main'
 [[tool.poetry.source]]
 name = "torch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
-# priority = 'explicit'
+priority = 'explicit'
 
 [build-system]
 requires = ["poetry-core"]
