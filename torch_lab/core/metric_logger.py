@@ -9,26 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 class LabMetricLogger(Callback):
-    def prepare_metrics(self, trainer, pl_module):
-        stage = trainer.state.stage
-        metrics_key = f"metrics_{stage}"
-
-        if hasattr(pl_module, metrics_key):
-            logger.info(f"Attribute '{metrics_key}' has been set.")
-            return
-
-        if not hasattr(pl_module, "metric"):
-            raise ValueError("Attribute 'metrics' must be set.")
-
-        metrics = getattr(pl_module, "metrics")
-        if isinstance(metrics, dict):
-            logger.info(f"Unpacking '{stage}' from 'metrics' dict.")
-            metrics = metrics[stage]
-        if not isinstance(metrics, list):
-            raise ValueError("Expected 'metrics' to be a list.")
-
-        logger.info(f"Setting attribute '{metrics_key}' from 'metrics'.")
-        setattr(pl_module, metrics_key, deepcopy(metrics))
+    def __init__(self, metrics):
+        metrics = torch.nn.ModuleDict(metrics or {})
+        self.metrics_train = metrics
+        self.metrics_validate = deepcopy(metrics)
+        self.metrics_test = deepcopy(metrics)
 
     def unpack_outputs(self, outputs):
         if isinstance(outputs, dict):
@@ -39,7 +24,7 @@ class LabMetricLogger(Callback):
     @torch.no_grad()
     def update_metrics(self, y_hat, y, trainer, pl_module):
         stage = trainer.state.stage
-        metrics = getattr(pl_module, f"metrics_{stage}")
+        metrics = getattr(self, f"metrics_{stage}")
         batch_size = len(y_hat)
 
         for metric_name, metric in metrics.items():
@@ -51,7 +36,7 @@ class LabMetricLogger(Callback):
     @torch.no_grad()
     def compute_metrics(self, trainer, pl_module):
         stage = trainer.state.stage
-        metrics = getattr(pl_module, f"metrics_{stage}")
+        metrics = getattr(self, f"metrics_{stage}")
 
         for metric_name, metric in metrics.items():
             result = metric.compute()
@@ -79,9 +64,6 @@ class LabMetricLogger(Callback):
                 self.log(key, v, **kwargs)
 
     ## Train methods
-    def on_train_start(self, trainer, pl_module):
-        self.prepare_metrics(trainer, pl_module)
-
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         y_hat, y = self.unpack_outputs(outputs)
         self.update_metrics(y_hat, y, trainer, pl_module)
@@ -90,9 +72,6 @@ class LabMetricLogger(Callback):
         self.compute_metrics(trainer, pl_module)
 
     ## Validation methods
-    def on_validation_start(self, trainer, pl_module):
-        self.prepare_metrics(trainer, pl_module)
-
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         y_hat, y = self.unpack_outputs(outputs)
         self.update_metrics(y_hat, y, trainer, pl_module)
@@ -102,9 +81,6 @@ class LabMetricLogger(Callback):
         self.compute_metrics(trainer, pl_module)
 
     ## Test methods
-    def on_test_start(self, trainer, pl_module):
-        self.prepare_metrics(trainer, pl_module)
-
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         y_hat, y = self.unpack_outputs(outputs)
         self.update_metrics(y_hat, y, trainer, pl_module)
