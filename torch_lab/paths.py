@@ -12,6 +12,7 @@ TORCHLAB_DIR = Path(__file__).absolute().parent
 ROOT_DIR = TORCHLAB_DIR.parent
 ARTIFACTS_DIR = ROOT_DIR / "artifacts"
 
+CLEARML_CONFIG_PATH = Path.home() / "clearml.conf"
 
 def import_model_config(config: Union[PathLike, Config]) -> Config:
     if isinstance(config, Config):

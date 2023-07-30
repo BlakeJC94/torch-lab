@@ -9,6 +9,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from torch_lab.core.config import Config
 from torch_lab.core.checkpoint import ClearmlModelCheckpoint
+from torch_lab.core.metric_logger import LabMetricLogger
 from torch_lab.core.utils import (
     verify_task_id,
     get_checkpoint_from_task,
@@ -18,9 +19,6 @@ from torch_lab.core.utils import (
     get_config_from_task,
 )
 from .paths import import_model_config, ARTIFACTS_DIR
-
-# TODO
-# task = Task.init(project_name="my project", task_name="my task")
 
 logger = logging.getLogger(__name__)
 logging.getLogger("torch._dynamo").setLevel(logging.WARNING)
@@ -76,6 +74,7 @@ def train(
     )
 
     callbacks = config.callbacks.get("train", [])
+    callbacks.append(LabMetricLogger(metrics=config.metrics))
     if not offline:
         callbacks.append(ClearmlModelCheckpoint(task=task, monitor=ckpt_monitor))
 

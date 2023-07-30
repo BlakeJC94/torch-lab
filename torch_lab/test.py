@@ -5,8 +5,9 @@ from typing import Optional
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.loggers import TensorBoardLogger
+from torch_lab.core.metric_logger import LabMetricLogger
 
-from .paths import import_model_config, ARTIFACTS_DIR
+from .paths import import_model_config, ARTIFACTS_DIR, CLEARML_CONFIG_PATH
 
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 def test(config: PathLike, weights_path: Optional[PathLike] = None, **kwargs):
     pl.seed_everything(0, workers=True)
+
+    if not CLEARML_CONFIG_PATH.exists():
+        raise FileNotFoundError("~/clearml.conf not found.")
 
     lab_config = import_model_config(config)
 
@@ -27,9 +31,12 @@ def test(config: PathLike, weights_path: Optional[PathLike] = None, **kwargs):
         default_hp_metric=False,
     )
 
+    callbacks = config.callbacks.get("test", [])
+    callbacks.append(LabMetricLogger(metrics=config.metrics))
+
     trainer = pl.Trainer(
         logger=tensorboard_logger,
-        callbacks=lab_config.callbacks,
+        callbacks=callbacks,
         **kwargs,
     )
 
