@@ -1,25 +1,9 @@
-"""Apply efficientnet_v2_s to aggregated spectrograms of EEG.
-
-- Augment EEGs with random saggital flip
-- Filter and scale EEG
-- Double Banana montage
-- Scale ECG
-- Tanh clip values
-- Compute spectrograms
-- Average across electrode groups
-- Append asymmetric spectrograms across sagittal plane
-
-TODO
-- Multi-taper spectrogram
-- Better filtering
-- Heart rate feature
-
-"""
-
+import logging
 import os
 from functools import partial
+from math import ceil, floor, sqrt
 from pathlib import Path
-from typing import *
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -27,20 +11,30 @@ import pytorch_lightning as pl
 import torch
 from core.modules import PredictModule, TrainModule
 from core.transforms import TransformCompose, TransformIterable
+from hms_brain_activity import logger
 from hms_brain_activity import metrics as m
 from hms_brain_activity import transforms as t
 from hms_brain_activity.callbacks import SubmissionWriter
 from hms_brain_activity.datasets import HmsDataset, PredictHmsDataset
 from hms_brain_activity.globals import VOTE_NAMES
-from hms_brain_activity.paths import DATA_PROCESSED_DIR
 from scipy.signal.windows import dpss
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchaudio.transforms import Spectrogram
 from torchmetrics import MeanSquaredError
+from torchmetrics.classification import (
+    MultilabelAUROC,
+    MultilabelAveragePrecision,
+    MultilabelPrecision,
+    MultilabelRecall,
+    MultilabelSpecificity,
+)
 from torchvision.models.efficientnet import efficientnet_v2_s
 
+logger = logger.getChild(Path(__file__).parent.name)
 
+
+## Spectrogram transforms
 class MultiTaperSpectrogram(nn.Module):
     """Create a multi-taper spectrogram transform for time series."""
 
@@ -146,12 +140,6 @@ class PostProcessSpectrograms(nn.Module):
         return x
 
 
-class KLDivWithLogitsLoss(nn.KLDivLoss):
-    def forward(self, y_hat, y):
-        y_hat = nn.functional.log_softmax(y_hat, dim=1)
-        return super().forward(y_hat, y)
-
-
 class AggregateSpectrograms(nn.Module):
     def forward(self, x):
         out = [
@@ -168,10 +156,60 @@ class AggregateSpectrograms(nn.Module):
         return torch.cat(out, dim=-3)
 
 
-def model_config(hparams):
-    n_channels = 4
-    n_classes = len(VOTE_NAMES)
+## Ensemble
+class MyEnsemble(nn.Module):
+    def __init__(
+        self,
+        n_channels,
+        n_classes,
+        spectrogram_transform,
+        seizure_classifier,
+        pdrda_classifier,
+    ):
+        super().__init__()
+        self.n_channels = n_channels
+        self.n_classes = n_classes
+        self.spectrogram_transform = spectrogram_transform
+        self.seizure_classifier = seizure_classifier
+        self.pdrda_classifier = pdrda_classifier
 
+        self.model_spectrogram = _net(n_channels + 3, n_classes)
+
+    def forward(self, x):
+        self.seizure_classifier.eval()
+        self.pdrda_classifier.eval()
+
+        # Get preds from upstream networks, don't forget softmax/sigmoid
+        y_hat_seizure = torch.sigmoid(self.seizure_classifier(x))
+        y_hat_pdrda = torch.softmax(self.pdrda_classifier(x), dim=1)[:, :-1, ...]
+        y_hat_seizure_pdrda = torch.cat([y_hat_seizure, y_hat_pdrda], dim=1)
+
+        # Compute spectrogram and concat mask
+        xs = self.spectrogram_transform(x)
+        xs = torch.cat(
+            [
+                y_hat_seizure_pdrda.unsqueeze(-1)
+                .unsqueeze(-1)
+                .expand(
+                    -1,
+                    -1,
+                    *xs.shape[-2:],
+                ),
+                xs,
+            ],
+            dim=1,
+        )
+
+        return self.model_spectrogram(xs)
+
+
+class KLDivWithLogitsLoss(nn.KLDivLoss):
+    def forward(self, y_hat, y):
+        y_hat = nn.functional.log_softmax(y_hat, dim=1)
+        return super().forward(y_hat, y)
+
+
+def _net(n_channels, n_classes):
     # Create Network
     net = efficientnet_v2_s(num_classes=n_classes)
 
@@ -188,7 +226,15 @@ def model_config(hparams):
     _conv0.weight = nn.init.kaiming_normal_(_conv0.weight, mode="fan_out")
     net.features[0][0] = _conv0
 
-    return nn.Sequential(
+    return net
+
+
+## Config
+def model_config(hparams):
+    n_channels = 4
+    n_classes = 6
+
+    spectrogram_transforms = [
         MultiTaperSpectrogram(
             int(hparams["config"]["sample_rate"]),
             int(hparams["config"]["sample_rate"]),
@@ -199,16 +245,37 @@ def model_config(hparams):
         PostProcessSpectrograms(hparams["config"]["sample_rate"], max_frequency=80),
         AggregateSpectrograms(),
         nn.BatchNorm2d(num_features=n_channels),
-        net,
+    ]
+
+    seizure_classifier = PredictModule(
+        nn.Sequential(
+            *spectrogram_transforms,
+            _net(n_channels, 1),
+        )
+    )
+
+    pdrda_classifier = PredictModule(
+        nn.Sequential(
+            *spectrogram_transforms,
+            _net(n_channels, 3),
+        )
+    )
+
+    return MyEnsemble(
+        n_channels=n_channels,
+        n_classes=n_classes,
+        spectrogram_transform=nn.Sequential(*spectrogram_transforms),
+        seizure_classifier=seizure_classifier,
+        pdrda_classifier=pdrda_classifier,
     )
 
 
 def transforms(hparams):
     return [
         *[
-            TransformIterable(["EEG"], transform)
+            TransformIterable(["EEG", "ECG"], transform)
             for transform in [
-                t.Pad(padlen=2 * hparams["config"]["sample_rate"]),
+                t.Pad(padlen=3 * hparams["config"]["sample_rate"]),
                 t.HighPassNpArray(
                     hparams["config"]["bandpass_low"],
                     hparams["config"]["sample_rate"],
@@ -227,13 +294,11 @@ def transforms(hparams):
                     65,
                     hparams["config"]["sample_rate"],
                 ),
-                t.Unpad(padlen=2 * hparams["config"]["sample_rate"]),
+                t.Unpad(padlen=3 * hparams["config"]["sample_rate"]),
             ]
         ],
         TransformIterable(["EEG"], t.DoubleBananaMontageNpArray()),
-        t.Scale({"ECG": 1 / 1e4, "EEG": 1 / (35 * 1.5)}),
         t.JoinArrays(),
-        t.TanhClipNpArray(4),
         t.ToTensor(),
     ]
 
@@ -266,54 +331,128 @@ def metrics(hparams):
     }
 
 
-def train_config(hparams):
-    optimizer_factory = partial(
-        optim.Adam,
+def optimizer_factory(hparams, *args, **kwargs):
+    return optim.AdamW(
+        *args,
         lr=hparams["config"]["learning_rate"],
+        weight_decay=hparams["config"]["weight_decay"],
+        **kwargs,
     )
 
-    scheduler_factory = lambda opt: {
-        "scheduler": optim.lr_scheduler.MultiStepLR(
-            opt,
-            milestones=hparams["config"]["milestones"],
-            gamma=hparams["config"]["gamma"],
+
+def scheduler_factory(hparams, *args, **kwargs):
+    return {
+        "scheduler": optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            *args,
+            T_0=hparams["config"]["learning_rate_decay_epochs"],
+            eta_min=hparams["config"]["learning_rate_min"],
+            **kwargs,
         ),
         "monitor": hparams["config"]["monitor"],
     }
 
-    module = TrainModule(
-        model_config(hparams),
-        loss_function=KLDivWithLogitsLoss(reduction="batchmean"),
-        metrics=metrics(hparams),
-        optimizer_factory=optimizer_factory,
-        scheduler_factory=scheduler_factory,
-    )
 
-    data_dir = "./data/hms/train_eegs"
+def get_ann(ann_path, data_dir):
+    # Load patient_list
+    patient_ids = pd.read_csv(ann_path)["patient_id"]
+    # Load master train.csv
+    ann = pd.read_csv(Path(data_dir).parent / "train.csv")
+    # Filter
+    ann = ann[ann["patient_id"].isin(patient_ids)]
+    # Clean
+    ann = ann[
+        [
+            "eeg_id",
+            # 'eeg_sub_id',
+            "eeg_label_offset_seconds",
+            # 'spectrogram_id',
+            # 'spectrogram_sub_id',
+            # 'spectrogram_label_offset_seconds',
+            # 'label_id',
+            "patient_id",
+            # "expert_consensus",
+            "seizure_vote",
+            "lpd_vote",
+            "gpd_vote",
+            "lrda_vote",
+            "grda_vote",
+            "other_vote",
+        ]
+    ].copy()
+    ann["eeg_id"] = ann["eeg_id"].astype(str)
+    # Transform
+    ann[VOTE_NAMES] = ann[VOTE_NAMES] / ann[VOTE_NAMES].to_numpy().sum(
+        axis=1, keepdims=True
+    )
+    ann = ann[
+        [
+            "eeg_id",
+            "eeg_label_offset_seconds",
+            "patient_id",
+            "seizure_vote",
+            "lpd_vote",
+            "gpd_vote",
+            "lrda_vote",
+            "grda_vote",
+            "other_vote",
+        ]
+    ].copy()
+    return ann
+
+
+def train_config(hparams):
+    data_dir = hparams["config"]["data_dir"]
+    train_ann = get_ann(hparams["config"]["train_ann"], data_dir)
 
     train_dataset = HmsDataset(
         data_dir=data_dir,
-        annotations=pd.read_csv(DATA_PROCESSED_DIR / "train.csv"),
+        annotations=train_ann,
         augmentation=TransformCompose(
-            TransformIterable(["EEG"], t.RandomSaggitalFlipNpArray())
+            TransformIterable(["EEG"], t.RandomSaggitalFlipNpArray(0.3)),
         ),
         transform=TransformCompose(
             *transforms(hparams),
-            t.VotesToProbabilities(),
         ),
     )
 
     val_dataset = HmsDataset(
         data_dir=data_dir,
-        annotations=pd.read_csv(DATA_PROCESSED_DIR / "val.csv"),
+        annotations=get_ann(hparams["config"]["val_ann"], data_dir),
         transform=TransformCompose(
             *transforms(hparams),
-            t.VotesToProbabilities(),
         ),
     )
 
+    model = TrainModule(
+        model_config(hparams),
+        loss_function=KLDivWithLogitsLoss(reduction="batchmean"),
+        metrics=metrics(hparams),
+        optimizer_factory=partial(optimizer_factory, hparams),
+        scheduler_factory=partial(scheduler_factory, hparams),
+    )
+
+    seizure_classifier = model.model.seizure_classifier
+    weights = hparams["config"]["seizure_weights"]
+    logger.info(f"Loading and freezing seizure weights from '{str(weights)}'")
+    weights = torch.load(weights, map_location="cpu")
+    _ = weights["state_dict"].pop("loss_function.pos_weight")
+    seizure_classifier.load_state_dict(weights["state_dict"])
+    for param in seizure_classifier.parameters():
+        param.requires_grad = False
+    seizure_classifier.eval()
+
+    pdrda_classifier = model.model.pdrda_classifier
+    weights = hparams["config"]["pdrda_weights"]
+    logger.info(f"Loading and freezing pdrda weights from '{str(weights)}'")
+    weights = torch.load(weights, map_location="cpu")
+    _ = weights["state_dict"].pop("loss_function.pos_weight")
+    pdrda_classifier.load_state_dict(weights["state_dict"])
+    for param in pdrda_classifier.parameters():
+        param.requires_grad = False
+    pdrda_classifier.eval()
+
     return dict(
-        model=module,
+        model=model,
         train_dataloaders=DataLoader(
             train_dataset,
             batch_size=hparams["config"]["batch_size"],
@@ -348,11 +487,13 @@ def num_workers(hparams) -> int:
 def output_transforms(hparams):
     return [
         lambda y_pred, md: (y_pred.to(torch.double), md),
-        lambda y_pred, md: (torch.softmax(y_pred, axis=1), md),
+        lambda y_pred, md: (torch.softmax(y_pred, dim=1), md),
     ]
 
 
 def predict_config(hparams, predict_args):
+    weights_path, data_dir = predict_args
+
     module = PredictModule(
         model_config(hparams),
         transform=TransformCompose(
@@ -361,12 +502,11 @@ def predict_config(hparams, predict_args):
         ),
     )
 
-    weights_path, *dataset_args = predict_args
     weights_path = Path(weights_path)
     ckpt = torch.load(weights_path, map_location="cpu")
     module.load_state_dict(ckpt["state_dict"])
 
-    data_dir = Path(dataset_args[0]).expanduser()
+    data_dir = Path(data_dir).expanduser()
     predict_dataset = PredictHmsDataset(
         data_dir=data_dir,
         transform=TransformCompose(*transforms(hparams)),

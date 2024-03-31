@@ -1,46 +1,40 @@
-"""Apply efficientnet_v2_s to aggregated spectrograms of EEG.
-
-- Augment EEGs with random saggital flip
-- Filter and scale EEG
-- Double Banana montage
-- Scale ECG
-- Tanh clip values
-- Compute spectrograms
-- Average across electrode groups
-- Append asymmetric spectrograms across sagittal plane
-
-TODO
-- Multi-taper spectrogram
-- Better filtering
-- Heart rate feature
-
-"""
+"""Learn seizures only with BCE loss with a positive class weight"""
 
 import os
 from functools import partial
+from math import ceil, floor, sqrt
 from pathlib import Path
-from typing import *
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-from core.modules import PredictModule, TrainModule
+from core.modules import TrainModule
 from core.transforms import TransformCompose, TransformIterable
+from hms_brain_activity import logger
 from hms_brain_activity import metrics as m
 from hms_brain_activity import transforms as t
-from hms_brain_activity.callbacks import SubmissionWriter
-from hms_brain_activity.datasets import HmsDataset, PredictHmsDataset
+from hms_brain_activity.datasets import HmsDataset
 from hms_brain_activity.globals import VOTE_NAMES
-from hms_brain_activity.paths import DATA_PROCESSED_DIR
 from scipy.signal.windows import dpss
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchaudio.transforms import Spectrogram
 from torchmetrics import MeanSquaredError
+from torchmetrics.classification import (
+    BinaryAUROC,
+    BinaryAveragePrecision,
+    BinaryPrecision,
+    BinaryRecall,
+    BinarySpecificity,
+)
 from torchvision.models.efficientnet import efficientnet_v2_s
 
+logger = logger.getChild(Path(__file__).parent.name)
 
+
+## Spectrogram transforms
 class MultiTaperSpectrogram(nn.Module):
     """Create a multi-taper spectrogram transform for time series."""
 
@@ -146,12 +140,6 @@ class PostProcessSpectrograms(nn.Module):
         return x
 
 
-class KLDivWithLogitsLoss(nn.KLDivLoss):
-    def forward(self, y_hat, y):
-        y_hat = nn.functional.log_softmax(y_hat, dim=1)
-        return super().forward(y_hat, y)
-
-
 class AggregateSpectrograms(nn.Module):
     def forward(self, x):
         out = [
@@ -168,9 +156,10 @@ class AggregateSpectrograms(nn.Module):
         return torch.cat(out, dim=-3)
 
 
+## Model config
 def model_config(hparams):
     n_channels = 4
-    n_classes = len(VOTE_NAMES)
+    n_classes = 1
 
     # Create Network
     net = efficientnet_v2_s(num_classes=n_classes)
@@ -206,9 +195,9 @@ def model_config(hparams):
 def transforms(hparams):
     return [
         *[
-            TransformIterable(["EEG"], transform)
+            TransformIterable(["EEG", "ECG"], transform)
             for transform in [
-                t.Pad(padlen=2 * hparams["config"]["sample_rate"]),
+                t.Pad(padlen=3 * hparams["config"]["sample_rate"]),
                 t.HighPassNpArray(
                     hparams["config"]["bandpass_low"],
                     hparams["config"]["sample_rate"],
@@ -227,93 +216,168 @@ def transforms(hparams):
                     65,
                     hparams["config"]["sample_rate"],
                 ),
-                t.Unpad(padlen=2 * hparams["config"]["sample_rate"]),
+                t.Unpad(padlen=3 * hparams["config"]["sample_rate"]),
             ]
         ],
         TransformIterable(["EEG"], t.DoubleBananaMontageNpArray()),
-        t.Scale({"ECG": 1 / 1e4, "EEG": 1 / (35 * 1.5)}),
         t.JoinArrays(),
-        t.TanhClipNpArray(4),
         t.ToTensor(),
     ]
 
 
 def metrics(hparams):
-    class_names = VOTE_NAMES
+    class_names = ["sz"]
     return {
         "mse": m.MetricWrapper(
-            lambda y_pred, y: (torch.softmax(y_pred, dim=1), y),
+            lambda y_pred, y: (torch.sigmoid(y_pred), y),
             MeanSquaredError(),
         ),
         "mean_y_pred": m.MetricWrapper(
-            lambda y_pred, y: (torch.softmax(y_pred, dim=1), y),
+            lambda y_pred, y: (torch.sigmoid(y_pred), y),
             m.MeanProbability(class_names=class_names),
         ),
         "mean_y": m.MetricWrapper(
             lambda y_pred, y: (y, y_pred),
             m.MeanProbability(class_names=class_names),
         ),
-        # "cross_entropy": m.MetricWrapper(
-        #     lambda y_pred, y: (torch.softmax(y_pred, dim=1), y),
-        #     m.PooledMean(
-        #         nn.CrossEntropyLoss(),
-        #     ),
-        # ),
         "prob_distribution": m.MetricWrapper(
-            lambda y_pred, y: (torch.softmax(y_pred, dim=1), y),
+            lambda y_pred, y: (torch.sigmoid(y_pred), y),
             m.ProbabilityDensity(class_names=class_names),
+        ),
+        "sensitivity-recall-tpr": m.MetricWrapper(
+            lambda y_pred, y: (torch.sigmoid(y_pred), y.int()),
+            BinaryRecall(threshold=0.5),
+        ),
+        "precision-selectivity-tnr": m.MetricWrapper(
+            lambda y_pred, y: (torch.sigmoid(y_pred), y.int()),
+            BinarySpecificity(threshold=0.5),
+        ),
+        "precision-ppv": m.MetricWrapper(
+            lambda y_pred, y: (torch.sigmoid(y_pred), y.int()),
+            BinaryPrecision(threshold=0.5),
+        ),
+        "prauc": m.MetricWrapper(
+            lambda y_pred, y: (torch.sigmoid(y_pred), y.int()),
+            BinaryAveragePrecision(thresholds=50),
+        ),
+        "auroc": m.MetricWrapper(
+            lambda y_pred, y: (torch.sigmoid(y_pred), y.int()),
+            BinaryAUROC(thresholds=50),
         ),
     }
 
 
-def train_config(hparams):
-    optimizer_factory = partial(
-        optim.Adam,
+def optimizer_factory(hparams, *args, **kwargs):
+    return optim.AdamW(
+        *args,
         lr=hparams["config"]["learning_rate"],
+        weight_decay=hparams["config"]["weight_decay"],
+        **kwargs,
     )
 
-    scheduler_factory = lambda opt: {
-        "scheduler": optim.lr_scheduler.MultiStepLR(
-            opt,
-            milestones=hparams["config"]["milestones"],
-            gamma=hparams["config"]["gamma"],
+
+def scheduler_factory(hparams, *args, **kwargs):
+    return {
+        "scheduler": optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            *args,
+            T_0=hparams["config"]["learning_rate_decay_epochs"],
+            eta_min=hparams["config"]["learning_rate_min"],
+            **kwargs,
         ),
         "monitor": hparams["config"]["monitor"],
     }
 
-    module = TrainModule(
-        model_config(hparams),
-        loss_function=KLDivWithLogitsLoss(reduction="batchmean"),
-        metrics=metrics(hparams),
-        optimizer_factory=optimizer_factory,
-        scheduler_factory=scheduler_factory,
-    )
 
-    data_dir = "./data/hms/train_eegs"
+def get_ann(ann_path, data_dir):
+    # Load patient_list
+    patient_ids = pd.read_csv(ann_path)["patient_id"]
+    # Load master train.csv
+    ann = pd.read_csv(Path(data_dir).parent / "train.csv")
+    # Filter
+    ann = ann[ann["patient_id"].isin(patient_ids)]
+    # Clean
+    ann = ann[
+        [
+            "eeg_id",
+            # 'eeg_sub_id',
+            "eeg_label_offset_seconds",
+            # 'spectrogram_id',
+            # 'spectrogram_sub_id',
+            # 'spectrogram_label_offset_seconds',
+            # 'label_id',
+            "patient_id",
+            # "expert_consensus",
+            "seizure_vote",
+            "lpd_vote",
+            "gpd_vote",
+            # "pd_vote",
+            "lrda_vote",
+            "grda_vote",
+            # "rda_vote",
+            "other_vote",
+        ]
+    ].copy()
+    ann["eeg_id"] = ann["eeg_id"].astype(str)
+    # Transform
+    ann["seizure_cls"] = (
+        (ann["seizure_vote"] / ann[VOTE_NAMES].sum(axis=1)) >= 0.5
+    ).astype(float)
+    ann = ann[
+        [
+            "eeg_id",
+            "eeg_label_offset_seconds",
+            "patient_id",
+            "seizure_cls",
+        ]
+    ].copy()
+    return ann
+
+
+def get_pos_weight(ann, vote_names):
+    y = ann[vote_names].to_numpy()
+    # pos_weight calculated as #neg/#pos
+    pos_weight = (y == 0.0).sum(axis=0) / y.sum(axis=0)
+    return torch.Tensor(pos_weight).float()
+
+
+def train_config(hparams):
+    data_dir = hparams["config"]["data_dir"]
+    train_ann = get_ann(hparams["config"]["train_ann"], data_dir)
+
+    vote_names = ["seizure_cls"]
+    pos_weight = get_pos_weight(train_ann, vote_names)
+    for n, v in zip(vote_names, pos_weight):
+        logger.info(f"weight {n}: {v}")
 
     train_dataset = HmsDataset(
         data_dir=data_dir,
-        annotations=pd.read_csv(DATA_PROCESSED_DIR / "train.csv"),
+        annotations=train_ann,
         augmentation=TransformCompose(
-            TransformIterable(["EEG"], t.RandomSaggitalFlipNpArray())
+            TransformIterable(["EEG"], t.RandomSaggitalFlipNpArray(0.3)),
         ),
         transform=TransformCompose(
             *transforms(hparams),
-            t.VotesToProbabilities(),
         ),
+        vote_names=vote_names,
     )
 
     val_dataset = HmsDataset(
         data_dir=data_dir,
-        annotations=pd.read_csv(DATA_PROCESSED_DIR / "val.csv"),
+        annotations=get_ann(hparams["config"]["val_ann"], data_dir),
         transform=TransformCompose(
             *transforms(hparams),
-            t.VotesToProbabilities(),
         ),
+        vote_names=vote_names,
     )
 
     return dict(
-        model=module,
+        model=TrainModule(
+            model_config(hparams),
+            loss_function=nn.BCEWithLogitsLoss(pos_weight=pos_weight),
+            metrics=metrics(hparams),
+            optimizer_factory=partial(optimizer_factory, hparams),
+            scheduler_factory=partial(scheduler_factory, hparams),
+        ),
         train_dataloaders=DataLoader(
             train_dataset,
             batch_size=hparams["config"]["batch_size"],
@@ -348,39 +412,44 @@ def num_workers(hparams) -> int:
 def output_transforms(hparams):
     return [
         lambda y_pred, md: (y_pred.to(torch.double), md),
-        lambda y_pred, md: (torch.softmax(y_pred, axis=1), md),
+        lambda y_pred, md: (torch.sigmoid(y_pred), md),
     ]
 
 
-def predict_config(hparams, predict_args):
-    module = PredictModule(
-        model_config(hparams),
-        transform=TransformCompose(
-            *output_transforms(hparams),
-            lambda y_pred, md: (y_pred.cpu().numpy(), md),
-        ),
-    )
+# def predict_config(hparams, predict_args):
+#     *weights_paths, data_dir = predict_args
 
-    weights_path, *dataset_args = predict_args
-    weights_path = Path(weights_path)
-    ckpt = torch.load(weights_path, map_location="cpu")
-    module.load_state_dict(ckpt["state_dict"])
+#     ensemble = []
+#     for weights_path in weights_paths:
+#         weights_path = Path(weights_path)
+#         ckpt = torch.load(weights_path, map_location="cpu")
+#         model = PredictModule(model_config(hparams))
+#         model.load_state_dict(ckpt["state_dict"])
+#         ensemble.append(model)
 
-    data_dir = Path(dataset_args[0]).expanduser()
-    predict_dataset = PredictHmsDataset(
-        data_dir=data_dir,
-        transform=TransformCompose(*transforms(hparams)),
-    )
+#     module = PredictModule(
+#         Ensemble(ensemble),
+#         transform=TransformCompose(
+#             *output_transforms(hparams),
+#             lambda y_pred, md: (y_pred.cpu().numpy(), md),
+#         ),
+#     )
 
-    return dict(
-        model=module,
-        predict_dataloaders=DataLoader(
-            predict_dataset,
-            batch_size=hparams["config"]["batch_size"],
-            num_workers=num_workers(hparams),
-            shuffle=False,
-        ),
-        callbacks=[
-            SubmissionWriter("./"),
-        ],
-    )
+#     data_dir = Path(data_dir).expanduser()
+#     predict_dataset = PredictHmsDataset(
+#         data_dir=data_dir,
+#         transform=TransformCompose(*transforms(hparams)),
+#     )
+
+#     return dict(
+#         model=module,
+#         predict_dataloaders=DataLoader(
+#             predict_dataset,
+#             batch_size=hparams["config"]["batch_size"],
+#             num_workers=num_workers(hparams),
+#             shuffle=False,
+#         ),
+#         callbacks=[
+#             SubmissionWriter("./"),
+#         ],
+#     )
