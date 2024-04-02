@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pytorch_lightning as pl
 import torch
 from clearml import Task
-from hms_brain_activity.paths import ARTIFACTS_DIR, get_task_dir_name
+from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
 from torch_lab.callbacks import EpochProgress, NanMonitor, PidMonitor
 from torch_lab.loggers import ClearMlLogger
 from torch_lab.utils import import_script_as_module, print_dict
