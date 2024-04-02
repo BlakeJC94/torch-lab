@@ -3,10 +3,10 @@
 Core components for experiments with Pytorch
 
 TODO
-- [ ] Merge artifacts into data
+- [x] Merge artifacts into data
 - [ ] Module checkpoint hooks
 - [ ] MNIST config
-- [ ] `--debug` parse as int or float
+- [x] `--debug` parse as int or float
 - [x] `predict` --> `infer`
 - [ ] Parse hparams as attrdicts
 - [x] Tasks to core
