@@ -15,9 +15,6 @@ try:
 except ImportError:
     Logger = None
 
-
-matplotlib.use("Agg")
-
 LRScheduler: TypeAlias = lr_scheduler._LRScheduler
 
 
@@ -169,6 +166,18 @@ class TrainModule(pl.LightningModule):
 
     def get_stage(self) -> str:
         return self.trainer.state.stage.value
+
+    def on_save_checkpoint(self, checkpoint):
+        for key in checkpoint["state_dict"]:
+            value = checkpoint["state_dict"].pop(key)
+            key_new = key.removeprefix("model.")
+            checkpoint["state_dict"][key_new] = value
+
+    def on_load_checkpoint(self, checkpoint):
+        for key in checkpoint["state_dict"]:
+            value = checkpoint["state_dict"].pop(key)
+            key_new = f"model.{key}"
+            checkpoint["state_dict"][key_new] = value
 
     ## Train methods
     def training_step(self, batch, batch_idx, _dataloader_idx=0):
