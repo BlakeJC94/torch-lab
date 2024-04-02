@@ -18,7 +18,46 @@ except ImportError:
 LRScheduler: TypeAlias = lr_scheduler._LRScheduler
 
 
-class TrainModule(pl.LightningModule):
+class _BaseModule(pl.LightningModule):
+    """Internal base class for pl modules.
+
+    Models are implemented as a single attribute, and the checkpoint will save the state dict with
+    key names that will work natively with the model outside the pl.module class.
+    """
+    def __init__(
+        self,
+        model: nn.Module,
+        transform: Optional[Callable] = None,
+    ):
+        super().__init__()
+        self.model = model
+        self.transform = transform or (lambda y_pred, md: (y_pred, md))
+
+    def forward(self, *args, **kwargs):
+        return self.model(*args, **kwargs)
+
+    def on_save_checkpoint(self, checkpoint):
+        for key in checkpoint["state_dict"]:
+            value = checkpoint["state_dict"].pop(key)
+            key_new = key.removeprefix("model.")
+            checkpoint["state_dict"][key_new] = value
+
+    def on_load_checkpoint(self, checkpoint):
+        for key in checkpoint["state_dict"]:
+            value = checkpoint["state_dict"].pop(key)
+            key_new = f"model.{key}"
+            checkpoint["state_dict"][key_new] = value
+
+
+class PredictModule(_BaseModule):
+    def predict_step(self, batch, batch_idx, _dataloader_idx=0):
+        x, md = batch
+        y_pred = self(x)
+        out, md = self.transform(y_pred.clone(), md)
+        return {"md": md, "y_pred": y_pred, "out": out}
+
+
+class TrainModule(_BaseModule):
     def __init__(
         self,
         model: nn.Module,
@@ -39,11 +78,8 @@ class TrainModule(pl.LightningModule):
                 expect a single argument, the registered optimizer.
             metrics: A dict of {metric_name: function}. Functions should accept 2 args:
                 predictions and labels, and return a scalar number.
-            hyperparams_ignore: A list of attribute strings to add to the `ignore` list in
-                `save_hyperparameters`.
         """
-        super().__init__()
-        self.model = model
+        super().__init__(model, transform=transform)
         self.loss_function = loss_function
         self.optimizer_factory = optimizer_factory
         self.scheduler_factory = scheduler_factory
@@ -55,7 +91,6 @@ class TrainModule(pl.LightningModule):
                 for k in ["train", "sanity_check", "validate", "test", "predict"]
             }
         )
-        self.transform = transform or (lambda y_pred, md: (y_pred, md))
 
         self.save_hyperparameters(
             ignore=[
@@ -77,9 +112,6 @@ class TrainModule(pl.LightningModule):
         if self.scheduler_factory:
             out["lr_scheduler"] = self.scheduler_factory(out["optimizer"])
         return out
-
-    def forward(self, *args, **kwargs):
-        return self.model(*args, **kwargs)
 
     ## Metric and loss logging methods
     def loss_calculate_and_log(self, y_pred: Any, md: Any) -> torch.Tensor:
@@ -167,18 +199,6 @@ class TrainModule(pl.LightningModule):
     def get_stage(self) -> str:
         return self.trainer.state.stage.value
 
-    def on_save_checkpoint(self, checkpoint):
-        for key in checkpoint["state_dict"]:
-            value = checkpoint["state_dict"].pop(key)
-            key_new = key.removeprefix("model.")
-            checkpoint["state_dict"][key_new] = value
-
-    def on_load_checkpoint(self, checkpoint):
-        for key in checkpoint["state_dict"]:
-            value = checkpoint["state_dict"].pop(key)
-            key_new = f"model.{key}"
-            checkpoint["state_dict"][key_new] = value
-
     ## Train methods
     def training_step(self, batch, batch_idx, _dataloader_idx=0):
         x, md = batch
@@ -213,23 +233,3 @@ class TrainModule(pl.LightningModule):
 
     def on_test_epoch_end(self):
         self.metrics_compute_and_log()
-
-
-class PredictModule(pl.LightningModule):
-    def __init__(
-        self,
-        model: nn.Module,
-        transform: Optional[Callable] = None,
-    ):
-        super().__init__()
-        self.model = model
-        self.transform = transform or (lambda y_pred, md: (y_pred, md))
-
-    def forward(self, *args, **kwargs):
-        return self.model(*args, **kwargs)
-
-    def predict_step(self, batch, batch_idx, _dataloader_idx=0):
-        x, md = batch
-        y_pred = self(x)
-        out, md = self.transform(y_pred.clone(), md)
-        return {"md": md, "y_pred": y_pred, "out": out}
