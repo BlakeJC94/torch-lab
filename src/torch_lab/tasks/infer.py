@@ -1,14 +1,13 @@
 import argparse
+import logging
 from pathlib import Path
 from typing import List
 
 import pytorch_lightning as pl
 import torch
+from torch_lab.utils import import_script_as_module, print_dict
 
-from hms_brain_activity import logger
-from core.utils import import_script_as_module, print_dict
-
-logger = logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 def main() -> str:
@@ -31,7 +30,7 @@ def infer(hparams_path: str, predict_args: List[str]):
     logger.info(f"Using config at '{config_path}'")
     logger.info(f"Using predict args: {predict_args}")
     config_fn = import_script_as_module(config_path).predict_config
-    config = config_fn(hparams, predict_args)
+    config = config_fn(hparams, *predict_args)
 
     trainer = pl.Trainer(
         callbacks=config.get("callbacks", []),
