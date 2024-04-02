@@ -1,11 +1,10 @@
 import argparse
 import logging
-from pathlib import Path
 from typing import List
 
 import pytorch_lightning as pl
 import torch
-from torch_lab.utils import import_script_as_module, print_dict
+from torch_lab.utils import compile_config, get_hparams_and_config_path, print_dict
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +21,15 @@ def parse() -> argparse.Namespace:
 
 
 def infer(hparams_path: str, predict_args: List[str]):
-    hparams = import_script_as_module(hparams_path).hparams
+    hparams, config_path = get_hparams_and_config_path(hparams_path)
+
     logger.info("hparams =")
     logger.info(print_dict(hparams))
 
-    config_path = Path(hparams_path).parent / "__init__.py"
     logger.info(f"Using config at '{config_path}'")
     logger.info(f"Using predict args: {predict_args}")
-    config_fn = import_script_as_module(config_path).predict_config
-    config = config_fn(hparams, *predict_args)
+
+    config = compile_config(hparams, config_path, *predict_args, field="infer_config")
 
     trainer = pl.Trainer(
         callbacks=config.get("callbacks", []),

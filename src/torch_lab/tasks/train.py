@@ -2,15 +2,15 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import pytorch_lightning as pl
 import torch
 from clearml import Task
-from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
 from torch_lab.callbacks import EpochProgress, NanMonitor, PidMonitor
 from torch_lab.loggers import ClearMlLogger
-from torch_lab.utils import import_script_as_module, print_dict
+from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
+from torch_lab.utils import compile_config, get_hparams_and_config_path, print_dict
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,8 @@ def train(
     logger.info(f"Using config at '{config_path}'")
 
     # Compile config from hparams
-    config = compile_config(hparams, config_path, pdb, "train_config")
+    logger.info("Setting hparams on config")
+    config = compile_config(hparams, config_path, pdb=pdb, field="train_config")
     hparams, config = load_weights(hparams, config)
 
     # Initialise callbacks
@@ -153,52 +154,6 @@ def get_task_name(hparams_path: Path, dev_run: bool):
     if dev_run:
         task_name = f"dev_{task_name}"
     return task_name
-
-
-def get_hparams_and_config_path(
-    hparams_path: Path,
-    dev_run: bool,
-) -> Tuple[Dict[str, Any], str]:
-    hparams = import_script_as_module(hparams_path).hparams
-    if dev_run:
-        hparams = set_hparams_debug_overrides(hparams, dev_run)
-
-    config_path = Path(hparams_path).parent / "__init__.py"
-    return hparams, config_path
-
-
-def set_hparams_debug_overrides(hparams, dev_run):
-    """"""
-    # Task overrides
-    hparams["task"]["init"]["project_name"] = "test"
-    # Config overrides
-    hparams["config"]["num_workers"] = 0
-    # Trainer overrides
-    hparams["trainer"]["init"]["log_every_n_steps"] = 1
-    hparams["trainer"]["init"]["overfit_batches"] = (
-        float(dev_run) if "." in dev_run else int(dev_run)
-    )
-    return hparams
-
-
-def compile_config(
-    hparams: Dict[str, Any],
-    config_path: Path,
-    pdb: bool,
-    field: str = "train_config",
-) -> Dict[str, Any]:
-    config_fn = getattr(import_script_as_module(config_path), field)
-    logger.info("Setting hparams on config")
-
-    try:
-        config = config_fn(hparams)
-    except Exception as err:
-        logger.error(f"Couldn't import config: {str(err)}")
-        if pdb:
-            breakpoint()
-        raise err
-
-    return config
 
 
 def load_weights(
