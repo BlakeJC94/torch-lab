@@ -1,12 +1,12 @@
 import argparse
+import logging
 import os
 import concurrent.futures as cf
 from typing import List, Optional
 
-from hms_brain_activity import logger
-from tasks.train import train
+from torch_lab.tasks.train import train
 
-logger = logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 def main() -> str:
