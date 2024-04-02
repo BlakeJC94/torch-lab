@@ -12,7 +12,7 @@ logger = logger.getChild(__name__)
 
 
 def main() -> str:
-    return predict(**vars(parse()))
+    return infer(**vars(parse()))
 
 
 def parse() -> argparse.Namespace:
@@ -22,7 +22,7 @@ def parse() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def predict(hparams_path: str, predict_args: List[str]):
+def infer(hparams_path: str, predict_args: List[str]):
     hparams = import_script_as_module(hparams_path).hparams
     logger.info("hparams =")
     logger.info(print_dict(hparams))

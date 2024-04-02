@@ -7,7 +7,7 @@ TODO
 - [ ] Module checkpoint hooks
 - [ ] MNIST config
 - [ ] `--debug` parse as int or float
-- [ ] `predict` --> `infer`
+- [x] `predict` --> `infer`
 - [ ] Parse hparams as attrdicts
 - [x] Tasks to core
 - [x] Core -> torch_lab
@@ -55,7 +55,7 @@ $ train <path/to/hparams.py> [--dev-run <float or int>] [--offline] [--debug]
 
 To launch an inference job:
 ```bash
-$ predict <path/to/hparams.py> <path/to/weights.ckpt>
+$ infer <path/to/hparams.py> [<extra args specified in config>]
 ```
 
 ## Development
