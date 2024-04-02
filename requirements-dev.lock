@@ -18,6 +18,8 @@ asttokens==2.4.1
     # via stack-data
 async-timeout==4.0.3
     # via aiohttp
+attrdict==2.0.1
+    # via torch-lab
 attrs==23.2.0
     # via aiohttp
     # via clearml
@@ -31,6 +33,7 @@ certifi==2024.2.2
 charset-normalizer==3.3.2
     # via requests
 clearml==1.14.4
+    # via torch-lab
 click==8.1.7
     # via black
     # via flask
@@ -40,7 +43,9 @@ cycler==0.12.1
     # via matplotlib
 dash==2.16.1
     # via dash-bootstrap-components
+    # via torch-lab
 dash-bootstrap-components==1.5.0
+    # via torch-lab
 dash-core-components==2.0.0
     # via dash
 dash-html-components==2.0.0
@@ -49,7 +54,6 @@ dash-table==5.0.0
     # via dash
 decorator==5.1.1
     # via ipython
-    # via mne
 exceptiongroup==1.2.0
     # via ipython
     # via pytest
@@ -67,10 +71,6 @@ fsspec==2024.2.0
     # via pytorch-lightning
 furl==2.1.3
     # via clearml
-gitdb==4.0.11
-    # via gitpython
-gitpython==3.1.42
-    # via hms-brain-activity
 grpcio==1.62.1
     # via tensorboard
 idna==3.6
@@ -87,19 +87,14 @@ jedi==0.19.1
     # via ipython
 jinja2==3.1.3
     # via flask
-    # via mne
-joblib==1.3.2
-    # via scikit-learn
 jsonschema==4.21.1
     # via clearml
 jsonschema-specifications==2023.12.1
     # via jsonschema
 kiwisolver==1.4.5
     # via matplotlib
-lazy-loader==0.3
-    # via mne
 lightning==2.1.4
-    # via hms-brain-activity
+    # via torch-lab
 lightning-utilities==0.10.1
     # via lightning
     # via pytorch-lightning
@@ -110,12 +105,10 @@ markupsafe==2.1.5
     # via jinja2
     # via werkzeug
 matplotlib==3.8.3
-    # via hms-brain-activity
-    # via mne
+    # via torch-lab
 matplotlib-inline==0.1.6
     # via ipython
-mne==1.6.1
-    # via hms-brain-activity
+mnist==0.2.2
 multidict==6.0.5
     # via aiohttp
     # via yarl
@@ -128,15 +121,10 @@ numpy==1.26.4
     # via contourpy
     # via lightning
     # via matplotlib
-    # via mne
-    # via pandas
-    # via pyarrow
+    # via mnist
     # via pytorch-lightning
-    # via scikit-learn
-    # via scipy
     # via tensorboard
     # via torchmetrics
-    # via torchvision
 orderedmultidict==1.0.1
     # via furl
 packaging==24.0
@@ -144,14 +132,10 @@ packaging==24.0
     # via lightning
     # via lightning-utilities
     # via matplotlib
-    # via mne
     # via plotly
-    # via pooch
     # via pytest
     # via pytorch-lightning
     # via torchmetrics
-pandas==2.2.1
-    # via hms-brain-activity
 parso==0.8.3
     # via jedi
 pathlib2==2.3.7.post1
@@ -163,19 +147,14 @@ pexpect==4.9.0
 pillow==10.2.0
     # via clearml
     # via matplotlib
-    # via torchvision
 pip==24.0
-    # via hms-brain-activity
 platformdirs==4.2.0
     # via black
-    # via pooch
 plotly==5.19.0
     # via dash
-    # via hms-brain-activity
+    # via torch-lab
 pluggy==1.4.0
     # via pytest
-pooch==1.8.1
-    # via mne
 prompt-toolkit==3.0.43
     # via ipython
 protobuf==4.25.3
@@ -186,8 +165,6 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.2
     # via stack-data
-pyarrow==15.0.1
-    # via hms-brain-activity
 pygments==2.17.2
     # via ipython
 pyjwt==2.8.0
@@ -199,11 +176,8 @@ pytest==8.1.1
 python-dateutil==2.9.0.post0
     # via clearml
     # via matplotlib
-    # via pandas
 pytorch-lightning==2.1.4
     # via lightning
-pytz==2024.1
-    # via pandas
 pyyaml==6.0.1
     # via clearml
     # via lightning
@@ -215,25 +189,18 @@ referencing==0.33.0
 requests==2.31.0
     # via clearml
     # via dash
-    # via pooch
-    # via torchvision
 retrying==1.3.4
     # via dash
 rpds-py==0.18.0
     # via jsonschema
     # via referencing
-scikit-learn==1.4.1.post1
-    # via hms-brain-activity
-scipy==1.12.0
-    # via hms-brain-activity
-    # via mne
-    # via scikit-learn
 setuptools==69.1.1
     # via dash
     # via lightning-utilities
     # via tensorboard
 six==1.16.0
     # via asttokens
+    # via attrdict
     # via clearml
     # via furl
     # via orderedmultidict
@@ -241,39 +208,27 @@ six==1.16.0
     # via python-dateutil
     # via retrying
     # via tensorboard
-smmap==5.0.1
-    # via gitdb
 stack-data==0.6.3
     # via ipython
 tenacity==8.2.3
     # via plotly
 tensorboard==2.16.2
-    # via hms-brain-activity
+    # via torch-lab
 tensorboard-data-server==0.7.2
     # via tensorboard
-threadpoolctl==3.3.0
-    # via scikit-learn
 tomli==2.0.1
     # via black
     # via pytest
 torch==1.12.1
-    # via hms-brain-activity
     # via lightning
     # via pytorch-lightning
-    # via torchaudio
+    # via torch-lab
     # via torchmetrics
-    # via torchvision
-torchaudio==0.12.1
-    # via hms-brain-activity
 torchmetrics==1.3.1
-    # via hms-brain-activity
     # via lightning
     # via pytorch-lightning
-torchvision==0.13.1
-    # via hms-brain-activity
 tqdm==4.66.2
     # via lightning
-    # via mne
     # via pytorch-lightning
 traitlets==5.14.1
     # via ipython
@@ -285,9 +240,6 @@ typing-extensions==4.10.0
     # via lightning-utilities
     # via pytorch-lightning
     # via torch
-    # via torchvision
-tzdata==2024.1
-    # via pandas
 urllib3==2.2.1
     # via clearml
     # via requests
