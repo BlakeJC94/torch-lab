@@ -1,6 +1,5 @@
 import logging
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
 
@@ -16,15 +15,6 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class _OfflineTask:
-    name: str
-
-    @property
-    def id(self):
-        return "offline"
-
-
 class ClearMlLogger(TensorBoardLogger):
     def __init__(
         self,
@@ -32,16 +22,11 @@ class ClearMlLogger(TensorBoardLogger):
         config_path: str | Path,
         task_name: str,
         root_dir: str | Path,
-        dev_run: bool = False,
-        offline: bool = False,
         **kwargs: Any,
     ):
         root_dir = Path(root_dir)
 
-        if offline or Task is None:
-            task = _OfflineTask(task_name)
-        else:
-            task = self.setup_task(hparams, config_path, task_name)
+        task = self.setup_task(hparams, config_path, task_name)
 
         super().__init__(
             save_dir=str(root_dir / f"{get_task_dir_name(task)}/logs"),

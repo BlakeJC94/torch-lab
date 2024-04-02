@@ -67,15 +67,21 @@ def train(
     hparams, config_path = get_hparams_and_config_path(hparams_path, dev_run)
 
     # Initialise logger
-    exp_logger = ClearMlLogger(
-        hparams=hparams,
-        config_path=config_path,
-        task_name=get_task_name(hparams_path, dev_run),
-        root_dir=ARTIFACTS_DIR,
-        offline=offline,
-    )
-    task = exp_logger.task
-    save_dir = ARTIFACTS_DIR / f"{get_task_dir_name(task)}/train"
+    if not offline:
+        exp_logger = ClearMlLogger(
+            hparams=hparams,
+            config_path=config_path,
+            task_name=get_task_name(hparams_path, dev_run),
+            root_dir=ARTIFACTS_DIR,
+        )
+        task_dir_name = get_task_dir_name(exp_logger.task)
+    else:
+        exp_logger = pl.loggers.TensorBoardLogger(
+            save_dir=str(ARTIFACTS_DIR / f"{task_dir_name}/logs"),
+            name="",
+            default_hp_metric=False,
+        )
+        task_dir_name = f"{get_task_name(hparams_path, dev_run)}-offline"
 
     logger.info("hparams =")
     logger.info(print_dict(hparams))
@@ -94,6 +100,7 @@ def train(
         *config.get("callbacks", []),
     ]
     if not dev_run:
+        save_dir = ARTIFACTS_DIR / f"{task_dir_name}"
         callbacks = [
             pl.callbacks.ModelCheckpoint(
                 save_dir / "model_weights",
