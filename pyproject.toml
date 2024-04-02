@@ -20,9 +20,9 @@ readme = "README.md"
 requires-python = ">= 3.10"
 
 [project.scripts]
-"train" = "tasks.train:main"
-"multitrain" = "tasks.multitrain:main"
-"predict" = "tasks.predict:main"
+"train" = "torch_lab.tasks.train:main"
+"multitrain" = "torch_lab.tasks.multitrain:main"
+"predict" = "torch_lab.tasks.predict:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -42,4 +42,4 @@ dev-dependencies = [
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/core"]
+packages = ["src/torch_lab"]

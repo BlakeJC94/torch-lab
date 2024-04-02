@@ -9,8 +9,8 @@ TODO
 - [ ] `--debug` parse as int or float
 - [ ] `predict` --> `infer`
 - [ ] Parse hparams as attrdicts
-- [ ] Tasks to core
-- [ ] Core -> torch_lab
+- [x] Tasks to core
+- [x] Core -> torch_lab
 
 ## Usage
 
