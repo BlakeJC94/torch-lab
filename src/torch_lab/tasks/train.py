@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -6,14 +7,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import pytorch_lightning as pl
 import torch
 from clearml import Task
-
-from hms_brain_activity import logger
-from core.callbacks import EpochProgress, NanMonitor, PidMonitor
-from core.loggers import ClearMlLogger
-from core.utils import import_script_as_module, print_dict
 from hms_brain_activity.paths import ARTIFACTS_DIR, get_task_dir_name
+from torch_lab.callbacks import EpochProgress, NanMonitor, PidMonitor
+from torch_lab.loggers import ClearMlLogger
+from torch_lab.utils import import_script_as_module, print_dict
 
-logger = logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 def main() -> str:
@@ -26,8 +25,8 @@ def parse() -> argparse.Namespace:
     parser.add_argument(
         "-d",
         "--dev-run",
-        type=float,
-        default=0.0,
+        type=str,
+        default="",
         help="Overfit batches (float as as fraction of batches, negative integer for one batch)",
     )
     parser.add_argument(
@@ -68,15 +67,14 @@ def train(
     hparams, config_path = get_hparams_and_config_path(hparams_path, dev_run)
 
     # Initialise logger
-    clearml_logger = ClearMlLogger(
+    exp_logger = ClearMlLogger(
         hparams=hparams,
         config_path=config_path,
         task_name=get_task_name(hparams_path, dev_run),
         root_dir=ARTIFACTS_DIR,
-        dev_run=dev_run,
         offline=offline,
     )
-    task = clearml_logger.task
+    task = exp_logger.task
     save_dir = ARTIFACTS_DIR / f"{get_task_dir_name(task)}/train"
 
     logger.info("hparams =")
@@ -108,7 +106,7 @@ def train(
     # Initialise trainer and kwargs
     trainer_fit_kwargs = hparams["trainer"].get("fit", {})
     trainer_init_kwargs = {
-        "logger": clearml_logger,
+        "logger": exp_logger,
         "accelerator": "gpu" if torch.cuda.is_available() else "cpu",
         "devices": "auto" if gpu_device is None else [gpu_device],
         "callbacks": callbacks,
@@ -170,7 +168,9 @@ def set_hparams_debug_overrides(hparams, dev_run):
     hparams["config"]["num_workers"] = 0
     # Trainer overrides
     hparams["trainer"]["init"]["log_every_n_steps"] = 1
-    hparams["trainer"]["init"]["overfit_batches"] = dev_run if dev_run > 0 else 1
+    hparams["trainer"]["init"]["overfit_batches"] = (
+        float(dev_run) if "." in dev_run else int(dev_run)
+    )
     return hparams
 
 
