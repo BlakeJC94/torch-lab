@@ -6,6 +6,7 @@ lightning_logs/*
 *.zip
 scrap*
 *.pid
+*.gz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
