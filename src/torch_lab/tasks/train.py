@@ -76,12 +76,12 @@ def train(
         )
         task_dir_name = get_task_dir_name(exp_logger.task)
     else:
+        task_dir_name = f"{get_task_name(hparams_path, dev_run)}-offline"
         exp_logger = pl.loggers.TensorBoardLogger(
             save_dir=str(ARTIFACTS_DIR / f"{task_dir_name}/logs"),
             name="",
             default_hp_metric=False,
         )
-        task_dir_name = f"{get_task_name(hparams_path, dev_run)}-offline"
 
     logger.info("hparams =")
     logger.info(print_dict(hparams))
@@ -132,9 +132,9 @@ def train(
 
     # Validate, then fit model
     try:
-        trainer.validate(config["model"], dataloaders=config["val_dataloaders"])
+        trainer.validate(config["module"], dataloaders=config["val_dataloaders"])
         trainer.fit(
-            config["model"],
+            config["module"],
             train_dataloaders=config["train_dataloaders"],
             val_dataloaders=config["val_dataloaders"],
             **trainer_fit_kwargs,

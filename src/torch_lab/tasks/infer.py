@@ -37,7 +37,7 @@ def infer(hparams_path: str, predict_args: List[str]):
         devices=[0] if torch.cuda.is_available() else "auto",
     )
     trainer.predict(
-        config["model"],
+        config["module"],
         dataloaders=config["predict_dataloaders"],
         return_predictions=False,
     )
