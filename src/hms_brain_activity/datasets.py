@@ -84,13 +84,6 @@ class HmsDataset(BaseDataset, HmsReaderMixin):
             "eeg_id": annotation.get("eeg_id", "None"),
         }
 
-    def get_data(self, eeg_path: str | Path, start: int = 0, duration: int = 50 * 200):
-        data = pd.read_parquet(eeg_path)
-        data = data[self.channel_names]
-        data = data.iloc[start : start + duration].to_numpy().transpose()
-        metadata = {"eeg_id": Path(eeg_path).stem}
-        return data, metadata
-
 
 class PredictHmsDataset(HmsDataset):
     def __init__(self, data_dir: str | Path, transform: Optional[Callable] = None):

@@ -4,6 +4,8 @@ from typing import Any, Dict, Tuple
 from torch import Tensor
 from torch.utils.data import Dataset
 
+from torch_lab.typing import CollateData
+
 
 class BaseDataset(Dataset, ABC):
     transform = None
@@ -17,13 +19,11 @@ class BaseDataset(Dataset, ABC):
     def get_raw_data(self, i: int) -> Any:
         pass
 
-    @abstractmethod
     def get_raw_label(self, i: int) -> Any:
-        pass
+        return None
 
-    @abstractmethod
     def get_additional_metadata(self, i: int) -> Dict[str, CollateData]:
-        pass
+        return {}
 
     def get_raw(self, i: int) -> Any:
         data = self.get_raw_data(i)
