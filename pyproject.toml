@@ -21,7 +21,7 @@ requires-python = ">= 3.10"
 [project.scripts]
 "train" = "torch_lab.tasks.train:main"
 "multitrain" = "torch_lab.tasks.multitrain:main"
-"predict" = "torch_lab.tasks.predict:main"
+"infer" = "torch_lab.tasks.infer:main"
 
 [build-system]
 requires = ["hatchling"]
