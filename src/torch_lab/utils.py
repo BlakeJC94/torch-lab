@@ -32,7 +32,7 @@ def get_hparams_and_config_path(
     if dev_run:
         hparams = set_hparams_debug_overrides(hparams, dev_run)
 
-    config_path = Path(hparams_path).parent / "__init__.py"
+    config_path = Path(hparams_path).parent / "__main__.py"
     return hparams, config_path
 
 
