@@ -1,11 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Tuple, TypeAlias
+from typing import Any, Dict, Tuple
 
-from numpy import ndarray
 from torch import Tensor
 from torch.utils.data import Dataset
-
-CollateData: TypeAlias = int | float | str | ndarray | Tensor
 
 
 class BaseDataset(Dataset, ABC):
