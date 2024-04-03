@@ -4,19 +4,37 @@ from typing import Any, Callable, Iterable, List
 from torch import nn
 
 
-class _BaseTransform(nn.Module, abc.ABC):
+class BaseTransform(nn.Module, abc.ABC):
     @abc.abstractmethod
     def compute(x, md):
         return x, md
 
     def forward(self, x, md=None):
         x, md = self.compute(x, md)
-        if md is None:
-            return x
         return x, md
 
 
-class TransformIterable(_BaseTransform):
+class BaseDataTransform(BaseTransform):
+    @abc.abstractmethod
+    def compute(x):
+        return x
+
+    def forward(self, x, md=None):
+        x = self.compute(x)
+        return x, md
+
+
+class BaseMetadataTransform(BaseTransform):
+    @abc.abstractmethod
+    def compute(md):
+        return md
+
+    def forward(self, x, md=None):
+        md = self.compute(md)
+        return x, md
+
+
+class TransformIterable(BaseTransform):
     def __init__(self, apply_to: List[Any], transform: Callable):
         super().__init__()
         self.transform = transform
@@ -34,7 +52,7 @@ class TransformIterable(_BaseTransform):
         return x, md
 
 
-class TransformCompose(_BaseTransform):
+class TransformCompose(BaseTransform):
     def __init__(self, *transforms):
         super().__init__()
         self.transforms = transforms
@@ -58,23 +76,3 @@ class TransformCompose(_BaseTransform):
         if isinstance(transforms, (tuple, list)):
             return TransformCompose(*transforms)
         return transforms
-
-
-class DataTransform(_BaseTransform):
-    def __init__(self, transform: Callable):
-        super().__init__()
-        self.transform = transform
-
-    def compute(self, x, md):
-        x = self.transform(x)
-        return x, md
-
-
-class MetadataTransform(_BaseTransform):
-    def __init__(self, transform: Callable):
-        super().__init__()
-        self.transform = transform
-
-    def compute(self, x, md):
-        md = self.transform(md)
-        return x, md
