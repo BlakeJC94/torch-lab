@@ -14,7 +14,6 @@ dependencies = [
     "dash>=2.16.1",
     "dash-bootstrap-components>=1.5.0",
     "clearml>=1.14.4",
-    "attrdict>=2.0.1",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -43,3 +42,6 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/torch_lab"]
+
+[tool.isort]
+known_first_party = ["torch_lab", "example_project"]
