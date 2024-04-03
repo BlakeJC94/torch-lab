@@ -16,8 +16,6 @@ aiosignal==1.3.1
     # via aiohttp
 async-timeout==4.0.3
     # via aiohttp
-attrdict==2.0.1
-    # via torch-lab
 attrs==23.2.0
     # via aiohttp
     # via clearml
@@ -155,7 +153,6 @@ setuptools==69.1.1
     # via lightning-utilities
     # via tensorboard
 six==1.16.0
-    # via attrdict
     # via clearml
     # via furl
     # via orderedmultidict
