@@ -37,13 +37,13 @@ class _BaseModule(pl.LightningModule):
         return self.model(*args, **kwargs)
 
     def on_save_checkpoint(self, checkpoint):
-        for key in checkpoint["state_dict"]:
+        for key in list(checkpoint["state_dict"].keys()):
             value = checkpoint["state_dict"].pop(key)
             key_new = key.removeprefix("model.")
             checkpoint["state_dict"][key_new] = value
 
     def on_load_checkpoint(self, checkpoint):
-        for key in checkpoint["state_dict"]:
+        for key in list(checkpoint["state_dict"].keys()):
             value = checkpoint["state_dict"].pop(key)
             key_new = f"model.{key}"
             checkpoint["state_dict"][key_new] = value
