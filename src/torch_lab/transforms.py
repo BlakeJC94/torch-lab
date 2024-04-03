@@ -5,7 +5,6 @@ from torch import nn
 
 
 class BaseTransform(nn.Module, abc.ABC):
-    @abc.abstractmethod
     def compute(x, md):
         return x, md
 
@@ -15,7 +14,6 @@ class BaseTransform(nn.Module, abc.ABC):
 
 
 class BaseDataTransform(BaseTransform):
-    @abc.abstractmethod
     def compute(x):
         return x
 
@@ -25,7 +23,6 @@ class BaseDataTransform(BaseTransform):
 
 
 class BaseMetadataTransform(BaseTransform):
-    @abc.abstractmethod
     def compute(md):
         return md
 
