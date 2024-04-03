@@ -4,8 +4,6 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Any, Tuple, Dict, Optional
 
-from attrdict import AttrDict
-
 
 def import_script_as_module(config_path) -> Any:
     config_path = Path(config_path)
@@ -59,7 +57,7 @@ def compile_config(
     config_fn = getattr(import_script_as_module(config_path), field)
 
     try:
-        config = config_fn(AttrDict(hparams), *config_args)
+        config = config_fn(hparams, *config_args)
     except Exception as err:
         logging.getLogger(__name__).error(f"Couldn't import config: {str(err)}")
         if pdb:
