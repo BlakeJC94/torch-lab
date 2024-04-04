@@ -104,29 +104,33 @@ def scheduler_factory(hparams: Dict[str, Any], *args, **kwargs) -> Dict[str, Any
 
 
 ## Configs
-# TODO Move dataset splitter to clearml
 def train_config(hparams: Dict[str, Any]) -> Dict[str, Any]:
-    logger.info("Downloading images")
-    train_images = mnist.train_images() / 255
+    """
+    Download train images with bash:
+        $ wget http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz -o path/to/output
+        $ wget http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz -o path/to/output
 
-    logger.info("Downloading labels")
-    train_labels = mnist.train_labels()
-
-    n_images = len(train_images)
-
-    split_idx = int(0.2 * n_images)
-    train_images, val_images = train_images[:split_idx], train_images[split_idx:]
-    train_labels, val_labels = train_labels[:split_idx], train_labels[split_idx:]
-
+    Or with python:
+        # pip install mnist
+        >>> import mnist
+        >>> mnist.download_file("train-images-idx3-ubyte.gz", "path/to/output")
+        >>> mnist.download_file("train-labels-idx1-ubyte.gz", "path/to/output")
+    """
     train_dataset = TrainDataset(
-        train_images,
-        train_labels,
+        (
+            hparams["config"]["data"],
+            hparams["config"]["annotations"],
+        ),
+        slice(None, 48000),
         augmentation=t.RandomFlip(0.4),
         transform=transform(hparams),
     )
     val_dataset = TrainDataset(
-        val_images,
-        val_labels,
+        (
+            hparams["config"]["data"],
+            hparams["config"]["annotations"],
+        ),
+        slice(48000, None),
         transform=transform(hparams),
     )
 
@@ -188,7 +192,7 @@ def infer_config(
     return dict(
         module=PredictModule(
             model_config(hparams),
-            transform=lambda y_pred, md: (y_pred.argmax().cpu().numpy(), md),
+            transform=lambda y_pred, md: (y_pred.argmax(1).cpu().numpy(), md),
         ),
         predict_dataloaders=DataLoader(
             predict_dataset,
