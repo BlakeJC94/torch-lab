@@ -10,7 +10,7 @@ from clearml import Task
 from torch_lab.callbacks import EpochProgress, NanMonitor, PidMonitor
 from torch_lab.loggers import ClearMlLogger
 from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
-from torch_lab.utils import compile_config, get_hparams_and_config_path, print_dict
+from torch_lab.utils import compile_config, get_hparams_and_config_path, dict_as_str
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +84,12 @@ def train(
         )
 
     logger.info("hparams =")
-    logger.info(print_dict(hparams))
+    logger.info(dict_as_str(hparams))
     logger.info(f"Using config at '{config_path}'")
 
     # Compile config from hparams
     logger.info("Setting hparams on config")
-    config = compile_config(hparams, config_path, pdb=pdb, field="train_config")
+    config = compile_config(config_path, hparams, field="train_config", pdb=pdb)
     hparams, config = load_weights(hparams, config)
 
     # Initialise callbacks
@@ -126,9 +126,9 @@ def train(
     trainer = pl.Trainer(**trainer_init_kwargs)
 
     logger.info("trainer_init_kwargs =")
-    logger.info(print_dict(trainer_init_kwargs))
+    logger.info(dict_as_str(trainer_init_kwargs))
     logger.info("trainer_fit_kwargs =")
-    logger.info(print_dict(trainer_fit_kwargs))
+    logger.info(dict_as_str(trainer_fit_kwargs))
 
     # Validate, then fit model
     try:
