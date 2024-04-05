@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 import pytorch_lightning as pl
 import torch
 from clearml import Task
-from torch_lab.callbacks import EpochProgress, NanMonitor, PidMonitor
+from torch_lab.callbacks import EpochProgress, NanMonitor
 from torch_lab.loggers import ClearMlLogger
 from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
 from torch_lab.utils import compile_config, get_hparams_and_config_path, dict_as_str
@@ -96,7 +96,6 @@ def train(
     callbacks = [
         EpochProgress(),
         NanMonitor(),
-        PidMonitor(),
         pl.callbacks.LearningRateMonitor(),
         *config.get("callbacks", []),
     ]

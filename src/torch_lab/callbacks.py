@@ -1,8 +1,5 @@
 import logging
-import os
-from pathlib import Path
 
-import psutil
 import pytorch_lightning as pl
 import torch
 
@@ -83,36 +80,3 @@ class NanMonitor(pl.Callback):
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
     ):
         self.check(batch_idx, batch, outputs)
-
-
-class PidMonitor(pl.Callback):
-    FILENAME = "./.train.{i}.pid"
-
-    def __init__(self):
-        super().__init__()
-        running_pids = psutil.pids()
-
-        globpat = self.FILENAME.split("/")[-1].replace("{i}", "*")
-        for fp in Path(".").glob(globpat):
-            pid = int(fp.read_text())
-            if pid in running_pids:
-                fp.unlink()
-
-        prev_files = Path(".").glob(globpat)
-        max_pid_i = -1
-        for fp in prev_files:
-            pid_i = int(fp.suffixes[0].removeprefix("."))
-            max_pid_i = max(max_pid_i, pid_i)
-        self.filename = Path(self.FILENAME.format(i=max_pid_i + 1))
-
-    def on_fit_start(self, trainer, pl_module):
-        with open(self.filename, "w") as f:
-            f.write(str(os.getpid()))
-
-    def on_fit_end(self, trainer, pl_module):
-        if self.filename.exists():
-            self.filename.unlink()
-
-    def on_exception(self, trainer, pl_module, exception):
-        if self.filename.exists():
-            self.filename.unlink()
