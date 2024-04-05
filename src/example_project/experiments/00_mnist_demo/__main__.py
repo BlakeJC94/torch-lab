@@ -13,7 +13,7 @@ from example_project.callbacks import MnistWriter
 from example_project.datasets import PredictDataset, TrainDataset
 from torch import nn, optim
 from torch.utils.data import DataLoader
-from torch_lab.modules import PredictModule, TrainModule
+from torch_lab.modules import LabModule, TrainModule
 from torch_lab.transforms import TransformCompose
 from torchmetrics import MeanSquaredError, Metric
 
@@ -190,7 +190,7 @@ def infer_config(
     )
 
     return dict(
-        module=PredictModule(
+        module=LabModule(
             model_config(hparams),
             transform=lambda y_pred, md: (y_pred.argmax(1).cpu().numpy(), md),
         ),

@@ -18,17 +18,26 @@ except ImportError:
 LRScheduler: TypeAlias = lr_scheduler._LRScheduler
 
 
-class _BaseModule(pl.LightningModule):
-    """Internal base class for pl modules.
+class LabModule(pl.LightningModule):
+    """Wrapper class for Pytorch modules for use with DataLoaders wrapped around implementations of
+    BaseDatasets.
 
     Models are implemented as a single attribute, and the checkpoint will save the state dict with
     key names that will work natively with the model outside the pl.module class.
     """
+
     def __init__(
         self,
         model: nn.Module,
         transform: Optional[Callable] = None,
     ):
+        """Initialise LabModule.
+
+        Args:
+            model: PyTorch module to call in the forward method.
+            transform: Transform to apply to outputs in the predict methods. Must take
+                (data, metadata) tuple and output another (output, metadata) tuple.
+        """
         super().__init__()
         self.model = model
         self.transform = transform or (lambda y_pred, md: (y_pred, md))
@@ -48,8 +57,7 @@ class _BaseModule(pl.LightningModule):
             key_new = f"model.{key}"
             checkpoint["state_dict"][key_new] = value
 
-
-class PredictModule(_BaseModule):
+    ## Predict methods
     def predict_step(self, batch, batch_idx, _dataloader_idx=0):
         x, md = batch
         y_pred = self(x)
@@ -57,7 +65,7 @@ class PredictModule(_BaseModule):
         return {"md": md, "y_pred": y_pred, "out": out}
 
 
-class TrainModule(_BaseModule):
+class TrainLabModule(LabModule):
     def __init__(
         self,
         model: nn.Module,
@@ -78,6 +86,8 @@ class TrainModule(_BaseModule):
                 expect a single argument, the registered optimizer.
             metrics: A dict of {metric_name: function}. Functions should accept 2 args:
                 predictions and labels, and return a scalar number.
+            transform: Transform to apply to outputs in the validation and test methods. Must take
+                (data, metadata) tuple and output another (output, metadata) tuple.
         """
         super().__init__(model, transform=transform)
         self.loss_function = loss_function
