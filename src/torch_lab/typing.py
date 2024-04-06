@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+"""Custom types used in torch_lab."""
 from typing import TypeAlias, Dict, Optional, List, Any
 from numpy import ndarray
 from torch import Tensor
