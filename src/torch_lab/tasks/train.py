@@ -1,8 +1,16 @@
+"""Choo choo
+
+Usage:
+
+    $ train <path/to/hparams> [--gpu-devices <int> <int> ...] [--dev-run <float or int>] [--offline]
+
+"""
 import argparse
 import logging
 import os
+import concurrent.futures as cf
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
 
 import pytorch_lightning as pl
 import torch
@@ -10,7 +18,7 @@ from clearml import Task
 from torch_lab.callbacks import EpochProgress, NanMonitor
 from torch_lab.loggers import ClearMlLogger
 from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
-from torch_lab.utils import compile_config, get_hparams_and_config_path, dict_as_str
+from torch_lab.utils import compile_config, dict_as_str, get_hparams_and_config_path
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +29,7 @@ def main() -> str:
 
 def parse() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("hparams_path")
+    parser.add_argument("hparams_paths", nargs="*", type=str)
     parser.add_argument(
         "-d",
         "--dev-run",
@@ -31,23 +39,71 @@ def parse() -> argparse.Namespace:
     )
     parser.add_argument(
         "-g",
-        "--gpu-device",
+        "--gpu-devices",
+        nargs="*",
         type=int,
-        default=None,
     )
     parser.add_argument("--pdb", action="store_true", default=False)
     parser.add_argument("-o", "--offline", action="store_true", default=False)
     return parser.parse_args()
 
-
 def train(
-    hparams_path: str,
-    gpu_device: Optional[int] = None,
-    dev_run: bool = False,
+    hparams_paths: List[str],
+    gpu_devices: Optional[List[int]] = None,
     pdb: bool = False,
     offline: bool = False,
 ):
-    """Choo choo"""
+    if gpu_devices is None:
+        gpu_devices = [None]
+
+    if pdb or dev_run:
+        if len(hparams_paths) != 1:
+            raise ValueError("Debugging only supported for one experiment at a time")
+        _train(
+            hparams_paths[0]
+            gpu_device=gpu_devices[0]
+            dev_run=dev_run
+            pdb=pdb,
+            offline=offline
+        )
+    else:
+        logger.info(f"Main Process ID: {os.getpid()}")
+        with cf.ProcessPoolExecutor(max_workers=len(hparams_paths)) as pool:
+            future_to_hparams_path = {}
+            for i, hparams_path in enumerate(hparams_paths):
+                gpu_device = gpu_devices[i % len(gpu_devices)]
+                future = pool.submit(_train, hparams_path, gpu_device=gpu_device, offline=offline)
+                future_to_hparams_path[future] = hparams_path
+
+            for future in cf.as_completed(future_to_hparams_path):
+                hparams_path = future_to_hparams_path[future]
+                try:
+                    _ = future.result()
+                except Exception as exc:
+                    print(f"Error occurred with '{hparams_path}': {exc}")
+        logger.info("Finished!")
+
+def _train(
+    hparams_path: str,
+    gpu_device: Optional[int] = None,
+    dev_run: str = "",
+    pdb: bool = False,
+    offline: bool = False,
+):
+    """Launch a training job.
+
+    Will log PID on info level at the start of the job to enable stopping the task with
+    `$ kill -2 <PID>`.
+
+    Args:
+        hparams_path: Path to hparams script.
+        gpu_device: Which GPU device index to use for training, used for `devices` kwarg in
+            `Trainer.__init__` (by default 0 if a gpu is found, otherwise defaults to None).
+        dev_run: Value to use for `overfit_batches` (int or float given as a string)
+        pdb: Whether to launch a PDB session when an exception is encountered in config compilation
+            or training.
+        offline: Whether to skip logging to ClearML.
+    """
     pl.seed_everything(0, workers=True)
     torch.set_float32_matmul_precision("high")
 
