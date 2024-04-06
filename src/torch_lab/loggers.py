@@ -1,3 +1,4 @@
+"""Logger used for managing tasks on ClearML."""
 import logging
 import re
 from pathlib import Path
