@@ -45,3 +45,12 @@ packages = ["src/torch_lab"]
 
 [tool.isort]
 known_first_party = ["torch_lab", "example_project"]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:::pytorch_lightning",
+    "ignore:::tensorboard",
+    "ignore::DeprecationWarning",
+]

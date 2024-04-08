@@ -5,6 +5,7 @@ Usage:
     $ train <path/to/hparams> [--gpu-devices <int> <int> ...] [--dev-run <float or int>] [--offline]
 
 """
+
 import argparse
 import concurrent.futures as cf
 import logging
@@ -15,6 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pytorch_lightning as pl
 import torch
 from clearml import Task
+
 from torch_lab.callbacks import EpochProgress, NanMonitor
 from torch_lab.loggers import ClearMlLogger
 from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
@@ -47,9 +49,10 @@ def parse() -> argparse.Namespace:
     parser.add_argument("-o", "--offline", action="store_true", default=False)
     return parser.parse_args()
 
+
 def train(
     hparams_paths: List[str],
-    dev_run:str = "",
+    dev_run: str = "",
     gpu_devices: Optional[List[int]] = None,
     pdb: bool = False,
     offline: bool = False,
@@ -65,7 +68,7 @@ def train(
             gpu_device=gpu_devices[0],
             dev_run=dev_run,
             pdb=pdb,
-            offline=offline
+            offline=offline,
         )
     else:
         logger.info(f"Main Process ID: {os.getpid()}")
@@ -73,7 +76,9 @@ def train(
             future_to_hparams_path = {}
             for i, hparams_path in enumerate(hparams_paths):
                 gpu_device = gpu_devices[i % len(gpu_devices)]
-                future = pool.submit(_train, hparams_path, gpu_device=gpu_device, offline=offline)
+                future = pool.submit(
+                    _train, hparams_path, gpu_device=gpu_device, offline=offline
+                )
                 future_to_hparams_path[future] = hparams_path
 
             for future in cf.as_completed(future_to_hparams_path):
@@ -83,6 +88,7 @@ def train(
                 except Exception as exc:
                     print(f"Error occurred with '{hparams_path}': {exc}")
         logger.info("Finished!")
+
 
 def _train(
     hparams_path: str,
