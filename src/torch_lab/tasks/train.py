@@ -6,11 +6,11 @@ Usage:
 
 """
 import argparse
+import concurrent.futures as cf
 import logging
 import os
-import concurrent.futures as cf
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import pytorch_lightning as pl
 import torch
@@ -49,6 +49,7 @@ def parse() -> argparse.Namespace:
 
 def train(
     hparams_paths: List[str],
+    dev_run:str = "",
     gpu_devices: Optional[List[int]] = None,
     pdb: bool = False,
     offline: bool = False,
@@ -60,9 +61,9 @@ def train(
         if len(hparams_paths) != 1:
             raise ValueError("Debugging only supported for one experiment at a time")
         _train(
-            hparams_paths[0]
-            gpu_device=gpu_devices[0]
-            dev_run=dev_run
+            hparams_paths[0],
+            gpu_device=gpu_devices[0],
+            dev_run=dev_run,
             pdb=pdb,
             offline=offline
         )
@@ -237,11 +238,11 @@ def load_weights(
     if weights_only:
         logger.info(f"Loading weights '{checkpoint_name}' from {checkpoint_task_id}")
         ckpt = torch.load(temp_path, map_location="cpu")
-        config["model"].load_state_dict(ckpt["state_dict"])
+        config["module"].model.load_state_dict(ckpt["state_dict"])
     else:
         logger.info(f"Loading checkpoint '{checkpoint_name}' from {checkpoint_task_id}")
         hparams["trainer"]["fit"] = {
-            **hparams["trainer"].get("init", {}),
+            **hparams["trainer"].get("fit", {}),
             "ckpt_path": str(temp_path),
         }
 
