@@ -1,8 +1,11 @@
 import pytest
+import pytorch_lightning as pl
 import torch
+from torch import nn, optim
+from torch.utils.data import DataLoader
 from torch_lab.datasets import BaseDataset
+from torch_lab.modules import TrainLabModule
 from torch_lab.transforms import BaseDataTransform
-
 
 
 @pytest.fixture
@@ -40,7 +43,8 @@ def hparams():
         },
     }
 
-## Datasets
+
+## Transforms
 class MockTransform(BaseDataTransform):
     def compute(self, x):
         return 2 * x
@@ -51,13 +55,15 @@ class MockAugmentation(BaseDataTransform):
         return x + 1
 
 
+## Datasets
 class MockDataset(BaseDataset):
-    def __init__(self, n_samples, transform, augmentation=None):
+    def __init__(self, n_samples, n_classes, transform, augmentation=None):
         super().__init__(transform, augmentation)
         self.n_samples = n_samples
+        self.n_classes = n_classes
 
         self.data = [i * torch.ones((1, 10, 10)) for i in range(n_samples)]
-        self.labels = [i * torch.ones((10)) % 2 for i in range(n_samples)]
+        self.labels = [i * torch.ones(n_classes) % 2 for i in range(n_samples)]
 
     def __len__(self):
         return self.n_samples
@@ -83,19 +89,90 @@ def n_samples():
 
 
 @pytest.fixture
-def mock_dataset(n_samples):
-    return MockDataset(n_samples, MockTransform())
+def n_classes():
+    return 10
+
+
+@pytest.fixture
+def mock_dataset(n_samples, n_classes):
+    return MockDataset(n_samples, n_classes, MockTransform())
 
 
 @pytest.fixture
 def mock_predict_dataset(n_samples):
-    return MockPredictDataset(n_samples, MockTransform())
+    return MockPredictDataset(n_samples, n_classes, MockTransform())
 
 
 @pytest.fixture
-def mock_dataset_augmentation(n_samples):
+def mock_dataset_augmentation(n_samples, n_classes):
     return MockDataset(
         n_samples,
+        n_classes,
         MockTransform(),
         MockAugmentation(),
     )
+
+
+@pytest.fixture
+def mock_dataloader(mock_dataset):
+    return DataLoader(mock_dataset, num_workers=0)
+
+
+## Modules
+class MockModel(nn.Sequential):
+    def __init__(self, n_channels, n_features, n_classes):
+        self.n_channels = n_channels
+        self.n_features = n_features
+        self.n_classes = n_classes
+
+        super().__init__(
+            nn.Sequential(
+                nn.Conv2d(n_channels, n_features, 3),
+                nn.BatchNorm2d(n_features),
+                nn.ReLU(),
+            ),
+            nn.Sequential(
+                nn.AvgPool2d(2),
+                nn.Conv2d(n_features, n_classes, 3),
+                nn.BatchNorm2d(n_classes),
+                nn.ReLU(),
+            ),
+            nn.AdaptiveAvgPool2d(1),
+        )
+
+    def forward(self, x):
+        x = super().forward(x)
+        x = x.squeeze(-1).squeeze(-1)
+        return x
+
+
+@pytest.fixture
+def mock_model(n_classes):
+    return MockModel(1, 16, n_classes)
+
+
+@pytest.fixture
+def train_module(mock_model):
+    return TrainLabModule(
+        mock_model,
+        loss_function=nn.BCEWithLogitsLoss(),
+        optimizer_factory=lambda params: optim.Adam(params, lr=3e-4),
+    )
+
+
+@pytest.fixture
+def trainer():
+    return pl.Trainer(logger=None,enable_progress_bar=False)
+
+
+@pytest.fixture
+def ckpt_path(train_module, tmp_path, mock_dataloader, trainer):
+    trainer.validate(train_module, mock_dataloader)
+    ckpt_path = tmp_path / "mock.ckpt"
+    trainer.save_checkpoint(ckpt_path)
+    return ckpt_path
+
+
+@pytest.fixture
+def train_module_checkpoint(ckpt_path):
+    return torch.load(ckpt_path)
