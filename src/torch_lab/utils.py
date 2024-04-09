@@ -72,7 +72,7 @@ def set_hparams_debug_overrides(hparams: JsonDict, dev_run: str) -> JsonDict:
             for trainer.
     """
     # Task overrides
-    hparams["task"]["init"]["project_name"] = "test"
+    hparams["task"]["project_name"] = "test"
     # Config overrides
     hparams["config"]["num_workers"] = 0
     # Trainer overrides

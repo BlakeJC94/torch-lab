@@ -61,7 +61,9 @@ class ClearMlLogger(TensorBoardLogger):
         return str(max_task_v + 1)
 
     def setup_task(self, hparams, config_path, task_name) -> Task:
-        project_name = hparams["task"]["init"]["project_name"]
+        task_init_kwargs = hparams.get("task", {})
+
+        project_name = task_init_kwargs.get("project_name", "unnamed")
         task_base_name, task_stem_name = task_name.split("-", 1)
         for k, v in {
             "project name": project_name,
@@ -78,7 +80,6 @@ class ClearMlLogger(TensorBoardLogger):
         logger.info(f"Task name: {task_name}")
 
         # Start ClearML
-        task_init_kwargs = hparams.get("task", {}).get("init", {})
         task_init_kwargs = {
             "continue_last_task": False,
             "reuse_last_task_id": False,

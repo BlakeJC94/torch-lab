@@ -86,7 +86,7 @@ def test_set_hparams_debug_overrides(hparams):
     dev_run = random.choice(["1", "3", "0.7"])
     input_hparams = hparams.copy()
     updated = set_hparams_debug_overrides(hparams, dev_run)
-    assert updated["task"]["init"]["project_name"] == "test"
+    assert updated["task"]["project_name"] == "test"
     assert updated["trainer"]["init"]["log_every_n_steps"] == 1
     assert (
         updated["trainer"]["init"]["overfit_batches"] == float(dev_run)
