@@ -6,7 +6,6 @@ import os
 from functools import partial
 from typing import Any, Dict
 
-import mnist
 import pytorch_lightning as pl
 from example_project import transforms as t
 from example_project.callbacks import MnistWriter
@@ -15,7 +14,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from torch_lab.modules import LabModule, TrainLabModule
 from torch_lab.transforms import TransformCompose
-from torchmetrics import MeanSquaredError, Metric
+from torchmetrics import Metric
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +171,6 @@ def infer_config(
     test_images_path: str,
 ) -> Dict[str, Any]:
     """
-
     Download test images with bash:
         $ wget http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz -o path/to/output
 
@@ -180,7 +178,6 @@ def infer_config(
         # pip install mnist
         >>> import mnist
         >>> mnist.download_file("t10k-images-idx3-ubyte.gz", "path/to/output")
-
     """
     test_images_path = Path(test_images_path).expanduser()
 

@@ -66,16 +66,28 @@ class LabModule(pl.LightningModule):
 
 
 class TrainLabModule(LabModule):
+    """Wrapper class for Pytorch modules for use with DataLoaders wrapped around implementations of
+    BaseDatasets.
+
+    Models are implemented as a single attribute, and the checkpoint will save the state dict with
+    key names that will work natively with the model outside the pl.module class.
+
+    Training-specific attributes are implemented in this variant:
+        - The loss function is a callable that maps batches (y_pred, y) to a float
+        - The optimiser is a callable that maps parameters to a torch.optim
+        - The scheduler is a callable that maps parameters to a scheduler_config (see
+          https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#configure-optimizers)
+    """
     def __init__(
         self,
         model: nn.Module,
-        loss_function: Optional[nn.Module],
+        loss_function: Callable,
         optimizer_factory: Callable,
         scheduler_factory: Optional[Callable] = None,
         metrics: Optional[Dict[str, Metric]] = None,
         transform: Optional[Callable] = None,
     ):
-        """
+        """Initialise a TrainLabModule.
 
         Args:
             model: PyTorch module to call in the forward method.
