@@ -13,7 +13,7 @@ from example_project.callbacks import MnistWriter
 from example_project.datasets import PredictDataset, TrainDataset
 from torch import nn, optim
 from torch.utils.data import DataLoader
-from torch_lab.modules import LabModule, TrainModule
+from torch_lab.modules import LabModule, TrainLabModule
 from torch_lab.transforms import TransformCompose
 from torchmetrics import MeanSquaredError, Metric
 
@@ -135,7 +135,7 @@ def train_config(hparams: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     return dict(
-        module=TrainModule(
+        module=TrainLabModule(
             model_config(hparams),
             loss_function=nn.BCEWithLogitsLoss(),
             metrics=metrics(hparams),
