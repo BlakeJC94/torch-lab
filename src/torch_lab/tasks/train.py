@@ -179,7 +179,11 @@ def _train(
     trainer_init_kwargs = {
         "logger": exp_logger,
         "accelerator": "gpu" if torch.cuda.is_available() else "cpu",
-        "devices": "auto" if gpu_device is None else [gpu_device],
+        "devices": (
+            "auto"
+            if gpu_device is None or not torch.cuda.is_available()
+            else [gpu_device]
+        ),
         "callbacks": callbacks,
         "num_sanity_val_steps": 0,
         "enable_progress_bar": False,
@@ -193,9 +197,17 @@ def _train(
     logger.info("trainer_fit_kwargs =")
     logger.info(dict_as_str(trainer_fit_kwargs))
 
+    trainer_validate_kwargs = {}
+    if "ckpt_path" in trainer_fit_kwargs:
+        trainer_validate_kwargs["ckpt_path"] = trainer_fit_kwargs["ckpt_path"]
+
     # Validate, then fit model
     try:
-        trainer.validate(config["module"], dataloaders=config["val_dataloaders"])
+        trainer.validate(
+            config["module"],
+            dataloaders=config["val_dataloaders"],
+            **trainer_validate_kwargs
+        )
         trainer.fit(
             config["module"],
             train_dataloaders=config["train_dataloaders"],
@@ -228,15 +240,14 @@ def load_weights(
 ]:
     ckpt_params = hparams["checkpoint"]
     checkpoint_task_id = ckpt_params.get("checkpoint_task_id")
-    if not checkpoint_task_id:
-        return hparams, config
+    if not checkpoint_task_id: return hparams, config
 
     checkpoint_name = ckpt_params.get("checkpoint_name", "last")
     weights_only = bool(ckpt_params.get("weights_only", False))
 
     prev_task = Task.get_task(task_id=checkpoint_task_id)
     prev_ckpt_id = prev_task.output_models_id[checkpoint_name]
-    model = Model(prev_ckpt_id)
+    model = Model(model_id=prev_ckpt_id)
     try:
         temp_path = model.get_local_copy(raise_on_error=True)
     except ValueError as error:
