@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.utilities import rank_zero_only
 
 from torch_lab.paths import get_task_dir_name
 
@@ -91,3 +92,8 @@ class ClearMlLogger(TensorBoardLogger):
         task.connect_configuration(config_path, "config")
         task.connect(hparams, "hparams")
         return task
+
+    @rank_zero_only
+    def finalize(self, status):
+        self.task.close()
+        super().finalize(status)
