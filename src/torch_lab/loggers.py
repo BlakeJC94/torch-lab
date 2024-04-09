@@ -1,4 +1,5 @@
 """Logger used for managing tasks on ClearML."""
+
 import logging
 import re
 from pathlib import Path
@@ -43,8 +44,23 @@ class ClearMlLogger(TensorBoardLogger):
 
         self.task = task
 
-    @staticmethod
-    def setup_task(hparams, config_path, task_name) -> Task:
+    @property
+    def version(self):
+        prev_tasks = Task.get_tasks(
+            project_name=self.project_name,
+            task_name=f"^{self.task_name}",
+        )
+        max_task_v = -1
+        for t in prev_tasks:
+            version_suffix = t.name.split("-", 2)[-1]
+            version_search = re.search(r"\d+", version_suffix)
+            if version_search is None:
+                continue
+            version = int(version_search.group(0))
+            max_task_v = max(max_task_v, version)
+        return str(max_task_v + 1)
+
+    def setup_task(self, hparams, config_path, task_name) -> Task:
         project_name = hparams["task"]["init"]["project_name"]
         task_base_name, task_stem_name = task_name.split("-", 1)
         for k, v in {
@@ -56,16 +72,9 @@ class ClearMlLogger(TensorBoardLogger):
                 raise ValueError(f"The character '-' is forbidden in the {k} ('{v}')")
 
         # Increment version of task
-        prev_tasks = Task.get_tasks(project_name=project_name, task_name=f"^{task_name}",)
-        max_task_v = -1
-        for t in prev_tasks:
-            version_suffix = t.name.split("-", 2)[-1]
-            version_search = re.search(r"\d+", version_suffix)
-            if version_search is None:
-                continue
-            version = int(version_search.group(0))
-            max_task_v = max(max_task_v, version)
-        task_name = "-v".join([task_name, str(max_task_v + 1)])
+        self.project_name = project_name
+        self.task_name = task_name
+        task_name = "-v".join([task_name, self.version])
         logger.info(f"Task name: {task_name}")
 
         # Start ClearML
