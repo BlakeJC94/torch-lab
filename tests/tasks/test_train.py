@@ -1,5 +1,4 @@
 import shutil
-from pathlib import Path
 from unittest.mock import ANY, call, patch
 
 import pytest
@@ -9,23 +8,6 @@ from clearml import Model, Task
 
 from torch_lab.tasks.train import train
 from torch_lab.utils import import_script_as_module
-
-
-@pytest.fixture
-def hparams_path():
-    return Path("./src/example_project/experiments/00_mnist_demo/hparams.py")
-
-
-@pytest.fixture
-def hparams_path_checkpoint():
-    return Path("./src/example_project/experiments/00_mnist_demo/hparams_checkpoint.py")
-
-
-@pytest.fixture
-def hparams_path_weights_only():
-    return Path(
-        "./src/example_project/experiments/00_mnist_demo/hparams_weights_only.py"
-    )
 
 
 @patch.object(torch.cuda, "is_available", autospec=True, return_value=False)

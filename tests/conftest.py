@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import pytest
 import pytorch_lightning as pl
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
+
 from torch_lab.datasets import BaseDataset
 from torch_lab.modules import TrainLabModule
 from torch_lab.transforms import BaseDataTransform
@@ -42,6 +45,23 @@ def hparams():
             "monitor": "loss/validate",
         },
     }
+
+
+@pytest.fixture
+def hparams_path():
+    return Path("./src/example_project/experiments/00_mnist_demo/hparams.py")
+
+
+@pytest.fixture
+def hparams_path_checkpoint():
+    return Path("./src/example_project/experiments/00_mnist_demo/hparams_checkpoint.py")
+
+
+@pytest.fixture
+def hparams_path_weights_only():
+    return Path(
+        "./src/example_project/experiments/00_mnist_demo/hparams_weights_only.py"
+    )
 
 
 ## Transforms
@@ -162,7 +182,7 @@ def train_module(mock_model):
 
 @pytest.fixture
 def trainer():
-    return pl.Trainer(logger=None,enable_progress_bar=False)
+    return pl.Trainer(logger=None, enable_progress_bar=False)
 
 
 @pytest.fixture
