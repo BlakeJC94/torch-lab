@@ -1,9 +1,17 @@
 """Callbacks implemented for tasks."""
+
+import json
 import logging
+import time
+from pathlib import Path
 
 import pytorch_lightning as pl
 import torch
 
+try:
+    from clearml import OutputModel, Task
+except ImportError:
+    Task, OutputModel = None, None
 
 logger = logging.getLogger(__name__)
 
@@ -81,3 +89,52 @@ class NanMonitor(pl.Callback):
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
     ):
         self.check(batch_idx, batch, outputs)
+
+
+class ClearMLModelCheckpoint(pl.callbacks.ModelCheckpoint):
+    """Base ModelCheckpoint with ClearML Hooks."""
+
+    def _save_checkpoint(self, trainer: pl.Trainer, filepath: str) -> None:
+        super()._save_checkpoint(trainer, filepath)
+        task = Task.current_task()
+        if task:
+            self.upload_weights_to_task(task, trainer, filepath)
+
+    @staticmethod
+    def upload_weights_to_task(task, trainer, filepath):
+        metrics = {
+            "time": time.time(),
+            "epoch": trainer.current_epoch
+            ** {k: v.cpu().item() for k, v in trainer.callback_metrics.items()},
+        }
+
+        output_model = OutputModel(
+            task=task,
+            name=task.name,
+            config_text=json.dumps(metrics, indent=2),
+        )
+        output_model.connect(task=task)
+
+        output_model.update_weights(
+            weights_filename=str(filepath),
+            iteration=trainer.global_step,
+            auto_delete_file=False,
+        )
+        output_model.wait_for_uploads()
+
+    def on_exception(self, trainer, pl_module, exception):
+        logger.warning(
+            f"Encountered '{str(exception)}', attempting to save weights to ClearML"
+        )
+
+        task = Task.current_task()
+        if not task:
+            logger.info("No active ClearML task detected, exiting.")
+            return
+
+        for filepath in [self.best_model_path, self.last_model_path]:
+            if Path(filepath).is_file():
+                try:
+                    self.upload_weights_to_task(task, trainer, filepath)
+                except Exception as err:
+                    logger.error(f"Couldn't upload '{filepath}': {str(err)}")

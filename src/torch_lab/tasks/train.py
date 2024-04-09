@@ -10,12 +10,13 @@ import argparse
 import concurrent.futures as cf
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pytorch_lightning as pl
 import torch
-from clearml import Task
+from clearml import Model, Task
 
 from torch_lab.callbacks import EpochProgress, NanMonitor
 from torch_lab.loggers import ClearMlLogger
@@ -233,23 +234,33 @@ def load_weights(
     checkpoint_name = ckpt_params.get("checkpoint_name", "last")
     weights_only = bool(ckpt_params.get("weights_only", False))
 
-    # TODO update to use remote checkpoint storage
     prev_task = Task.get_task(task_id=checkpoint_task_id)
-    temp_path = (
+    prev_ckpt_id = prev_task.output_models_id[checkpoint_name]
+    model = Model(prev_ckpt_id)
+    try:
+        temp_path = model.get_local_copy(raise_on_error=True)
+    except ValueError as error:
+        raise FileNotFoundError(
+            f"Failed to download weights '{checkpoint_name}' from {checkpoint_task_id}."
+        ) from error
+
+    weights_path = (
         ARTIFACTS_DIR
         / f"{get_task_dir_name(prev_task)}/train/model_weights/{checkpoint_name}.ckpt"
     )
+    weights_path.parent.mkdir(exist_ok=True, parents=True)
+    shutil.move(temp_path, weights_path)
 
     # If not weights only, add to fit kwargs
     if weights_only:
         logger.info(f"Loading weights '{checkpoint_name}' from {checkpoint_task_id}")
-        ckpt = torch.load(temp_path, map_location="cpu")
+        ckpt = torch.load(weights_path, map_location="cpu")
         config["module"].model.load_state_dict(ckpt["state_dict"])
     else:
         logger.info(f"Loading checkpoint '{checkpoint_name}' from {checkpoint_task_id}")
         hparams["trainer"]["fit"] = {
             **hparams["trainer"].get("fit", {}),
-            "ckpt_path": str(temp_path),
+            "ckpt_path": str(weights_path),
         }
 
     return hparams, config
