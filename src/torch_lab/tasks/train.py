@@ -60,7 +60,7 @@ def train(
     if gpu_devices is None:
         gpu_devices = [None]
 
-    if pdb or dev_run:
+    if pdb or dev_run or len(hparams_paths) == 1:
         if len(hparams_paths) != 1:
             raise ValueError("Debugging only supported for one experiment at a time")
         _train(
