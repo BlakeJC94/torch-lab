@@ -21,6 +21,15 @@ def parse() -> argparse.Namespace:
 
 
 def infer(hparams_path: str, predict_args: List[str]):
+    """Compile an inference configuration from a hparams script and external parameters.
+
+    Results are expected to be written by defining and passing a pl.Callback object.
+
+    Args:
+        hparams_path: Path to hyperparameters script which defines a function `infer_config` which
+            accepts at least one arg and returns an infer task config.
+        predict_args: List of args to apply to `infer_config`, can be obtained from the CLI input.
+    """
     hparams, config_path = get_hparams_and_config_path(hparams_path)
 
     logger.info("hparams =")

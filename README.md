@@ -114,6 +114,118 @@ example.
 The variable args can be accessed via the `infer` CLI, any args after the `hparams_path` will be
 passed into `infer_config` as strings.
 
+Note that a `pytorch_lightning.Callback` object must be defined to process and write predictions. No
+results are returned by default.
+
+### Extensions
+
+This repo enforces a particular structure on torch datasets:
+- The output of `__getitem__` is always a tuple
+    - First element is an array-like object, corresponding to a sample of data
+    - Seconds element is a dictionary with array-like values, corresponding to metadata
+        - Labels are stored under key `"y"`
+        - Values must be torch collate-friendly (either `int`, `float`, `str`, or an array)
+
+The provided wrapper classes `torch_lab.modules.LabeModule` and `torch_lab.module.TrainLabModule`
+effortlessly read datasets that conform to this structure. To implement custom datasets, this repo
+provides two base classes for implementing datasets and transforms:
+- `torch_lab.transforms.BaseTransform`
+- `torch_lab.datasets.BaseDataset`
+
+#### Transforms
+
+Transforms are implemented in `torch_lab.datasets.BaseDataset` as mappings which inherit from
+`torch.nn.Module` which map a tuple of data array and metadata dictionary `(x, md)` to another tuple
+of data array and metadata dictionary `(x_hat, md_hat)`.  Transforms are applied per sample, before
+returning as sample from a dataset via `__getitem__`.
+
+```python
+from torch_lab.transforms import BaseTransform
+
+class MyTransform(BaseTransform):
+    def __init__(self, ...):
+        ...
+
+    def compute(self, x, md):
+        ...
+        return x_hat, md_hat
+```
+
+Mapping tuples allows for full access for all sample information during a transformation. However,
+transforms that manipulate only data or only metadata can inherit from
+`torch_lab.transforms.BaseDataTransform` or `torch_lab.transforms.BaseMetdataTransform` instead.
+
+```python
+from torch_lab.transforms import BaseDataTransform, BaseMetadataTransform
+
+class MyDataTransform(BaseDataTransform):
+    def __init__(self, ...):
+        ...
+
+    def compute(self, x):
+        ...
+        return x_hat
+
+class MyMetadataTransform(BaseMetadataTransform):
+    def __init__(self, ...):
+        ...
+
+    def compute(self, md):
+        ...
+        return md_hat
+```
+
+#### Datasets
+
+Custom datasets should inherit from `torch_lab.datasets.BaseDataset`:
+```python
+from torch_lab.datasets import BaseDataset
+
+class MyDataset(BaseDataset):
+    def __init__(self, transform, augmentation, ...):
+        """Initialise dataset class"""
+        super().__init__(transform, augmentation)
+        ...
+
+    def __len__(self):
+        """Return length of dataset"""
+        return ...
+
+    def get_raw_data(self, i):
+        """Return single sample of data corresponding to index `i`."""
+        return ...
+
+    def get_raw_label(self, i):
+        """(Optional) Return single label of data corresponding to index `i`."""
+        return ...
+
+    def get_additional_metadata(self, i):
+        """(Optional) Return extra metadata attribure for metadata corresponding to index `i`."""
+        return { ... }
+```
+Transforms are assigned via the `__init__` call of the `BaseDataset` class. Augmentations and
+transforms are kept separate to make the distinction between transforms more strict to lower the
+risk of accidentally applying augmentations to validation, test, or predict datasets. Augmentations
+are also implemented via `BaseTransform` and other base classes, but they are always applied *before* the transform (if provided).
+
+Multiple transform objects can be chained/composed together using the
+`torch_lab.transform.TransfromCompose` class,
+```python
+from torch_lab.transform import TransfromCompose
+from my_project.transforms import *
+
+transform = TransformCompose(
+    Transform0(),
+    Transform1(),
+    Transform2(),
+)
+```
+
+This wrapper class can be sliced in order to debug parts of the transform pipeline, `transform[:2]`
+will return a new `TransformCompose` object from `(Transform0(), Transform1())`.
+
+Transforms can also be applied to iterables by with the wrapper class
+`torch_lab.transforms.TransformIterable`. See the documentation for further details.
 
 ### Endpoint usage
 
