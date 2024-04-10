@@ -18,7 +18,7 @@ import pytorch_lightning as pl
 import torch
 from clearml import Model, Task
 
-from torch_lab.callbacks import EpochProgress, NanMonitor
+from torch_lab.callbacks import EpochProgress, NanMonitor, ClearMLModelCheckpoint
 from torch_lab.loggers import ClearMlLogger
 from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
 from torch_lab.utils import compile_config, dict_as_str, get_hparams_and_config_path
@@ -58,6 +58,20 @@ def train(
     pdb: bool = False,
     offline: bool = False,
 ):
+    """Execute one or more single-GPU training tasks across multiple GPU devices.
+
+    Will print PID as an INFO log at start of processes to enable task stopping with `$ kill -2
+    <PID>`.
+
+    Args:
+        hparams_paths: List of paths to hyperparameters scripts to execute training jobs for.
+        dev_run: Float or int as a string to trigger overfitting batches. Only allowed when
+            executing a single training job.
+        gpu_devices: List of ints specifying which GPU devices to target. Defaults to [0].
+        pdb: Whether to launch PDB when an exception is raised in training, only allowed for a
+            single training job.
+        offline: Whether to disable ClearML logging.
+    """
     if gpu_devices is None:
         gpu_devices = [None]
 
@@ -166,7 +180,7 @@ def _train(
     if not dev_run:
         save_dir = ARTIFACTS_DIR / f"{task_dir_name}"
         callbacks = [
-            pl.callbacks.ModelCheckpoint(
+            ClearMLModelCheckpoint(
                 save_dir / "model_weights",
                 monitor=hparams["config"]["monitor"],
                 save_last=True,
