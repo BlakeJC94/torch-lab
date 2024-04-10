@@ -60,7 +60,7 @@ def model_config(hparams: Dict[str, Any]) -> nn.Module:
     )
 
 
-def transform(hparams: Dict[str, Any]) -> nn.Module:
+def transform_config(hparams: Dict[str, Any]) -> nn.Module:
     return TransformCompose(
         t.Scale(1 / 255),
         lambda x, md: (x.astype("float32"), md),
@@ -115,14 +115,15 @@ def train_config(hparams: Dict[str, Any]) -> Dict[str, Any]:
         >>> mnist.download_file("train-images-idx3-ubyte.gz", "path/to/output")
         >>> mnist.download_file("train-labels-idx1-ubyte.gz", "path/to/output")
     """
+    augmentation = t.RandomFlip(0.4)
+
     train_dataset = TrainDataset(
         (
             hparams["config"]["data"],
             hparams["config"]["annotations"],
         ),
         slice(None, 48000),
-        augmentation=t.RandomFlip(0.4),
-        transform=transform(hparams),
+        transform=augmentation + transform_config(hparams),
     )
     val_dataset = TrainDataset(
         (
@@ -130,7 +131,7 @@ def train_config(hparams: Dict[str, Any]) -> Dict[str, Any]:
             hparams["config"]["annotations"],
         ),
         slice(48000, None),
-        transform=transform(hparams),
+        transform=transform_config(hparams),
     )
 
     return dict(
@@ -183,7 +184,7 @@ def infer_config(
 
     predict_dataset = PredictDataset(
         test_images_path,
-        transform=transform(hparams),
+        transform=transform_config(hparams),
     )
 
     return dict(

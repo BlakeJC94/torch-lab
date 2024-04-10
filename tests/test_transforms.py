@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 import pytest
+
 from torch_lab.transforms import (
     BaseDataTransform,
     BaseMetadataTransform,
@@ -106,3 +107,38 @@ def test_transform_iterable(x, md):
 
     for i, k in enumerate(apply_to):
         assert (out[k] == i * x * 2).all()
+
+
+def test_add_transforms():
+    t1 = MockDataTransform()
+    t2 = MockMetadataTransform()
+    t = t1 + t2
+    assert isinstance(t, TransformCompose)
+    assert t == TransformCompose(t1, t2)
+
+
+def test_add_transform_compose():
+    t1 = MockDataTransform()
+    t2 = MockMetadataTransform()
+    t3 = TransformCompose(t1, t2)
+    t = t3 + t1
+    assert isinstance(t, TransformCompose)
+    assert t == TransformCompose(t1, t2, t1)
+
+
+def test_add_compose_transform():
+    t1 = MockDataTransform()
+    t2 = MockMetadataTransform()
+    t3 = TransformCompose(t1, t2)
+    t = t1 + t3
+    assert isinstance(t, TransformCompose)
+    assert t == TransformCompose(t1, t1, t2)
+
+
+def test_add_compose():
+    t1 = MockDataTransform()
+    t2 = MockMetadataTransform()
+    t3 = TransformCompose(t1, t2)
+    t = t3 + t3
+    assert isinstance(t, TransformCompose)
+    assert t == TransformCompose(t1, t2, t1, t2)

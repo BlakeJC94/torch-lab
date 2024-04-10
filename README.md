@@ -182,9 +182,9 @@ Custom datasets should inherit from `torch_lab.datasets.BaseDataset`:
 from torch_lab.datasets import BaseDataset
 
 class MyDataset(BaseDataset):
-    def __init__(self, transform, augmentation, ...):
+    def __init__(self, transform, ...):
         """Initialise dataset class"""
-        super().__init__(transform, augmentation)
+        super().__init__(transform)
         ...
 
     def __len__(self):
@@ -203,10 +203,8 @@ class MyDataset(BaseDataset):
         """(Optional) Return extra metadata attribure for metadata corresponding to index `i`."""
         return { ... }
 ```
-Transforms are assigned via the `__init__` call of the `BaseDataset` class. Augmentations and
-transforms are kept separate to make the distinction between transforms more strict to lower the
-risk of accidentally applying augmentations to validation, test, or predict datasets. Augmentations
-are also implemented via `BaseTransform` and other base classes, but they are always applied *before* the transform (if provided).
+Transforms are assigned via the `__init__` call of the `BaseDataset` class, and are computed during
+the call to `__getitem__`.
 
 Multiple transform objects can be chained/composed together using the
 `torch_lab.transform.TransfromCompose` class,

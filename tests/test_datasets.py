@@ -9,14 +9,9 @@ class MockTransform(BaseDataTransform):
         return 2 * x
 
 
-class MockAugmentation(BaseDataTransform):
-    def compute(self, x):
-        return x + 1
-
-
 class MockDataset(BaseDataset):
-    def __init__(self, n_samples, transform, augmentation=None):
-        super().__init__(transform, augmentation)
+    def __init__(self, n_samples, transform):
+        super().__init__(transform)
         self.n_samples = n_samples
 
         self.data = [i * torch.ones((2, 2)) for i in range(n_samples)]
@@ -55,28 +50,11 @@ def mock_predict_dataset(n_samples):
     return MockPredictDataset(n_samples, MockTransform())
 
 
-@pytest.fixture
-def mock_dataset_augmentation(n_samples):
-    return MockDataset(
-        n_samples,
-        MockTransform(),
-        MockAugmentation(),
-    )
-
-
 class TestBaseDataset:
     def test_getitem(self, mock_dataset, n_samples):
         """Test that transforms are applied and all metadata is returned."""
         for i, (x, md) in enumerate(mock_dataset):
             assert (x == 2 * i * torch.ones_like(x)).all()
-            assert md["idx"] == i
-            assert md["y"] == i % 2
-            assert md["foo"] == "bar"
-
-    def test_getitem_augmentation(self, mock_dataset_augmentation, n_samples):
-        """Test that augmentations are applied before the transform."""
-        for i, (x, md) in enumerate(mock_dataset_augmentation):
-            assert (x == 2 * (1 + i * torch.ones_like(x))).all()
             assert md["idx"] == i
             assert md["y"] == i % 2
             assert md["foo"] == "bar"

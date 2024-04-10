@@ -4,10 +4,12 @@ Base classes are intended to be subclassed to implement custom transforms to dat
 and these implementations are intended to be used in a TransformCompose object, and passed into an
 implementation of the BaseDataset class as the transform/augmentation attribute.
 """
+
 import abc
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from torch import nn
+
 from torch_lab.typing import CollateData
 
 
@@ -31,6 +33,13 @@ class BaseTransform(nn.Module, abc.ABC):
         """Apply transform."""
         x, md = self.compute(x, md)
         return x, md
+
+    def __add__(self, other):
+        """Chain transforms together by adding them."""
+        if isinstance(other, TransformCompose):
+            return TransformCompose(self, *other.transforms)
+        if isinstance(other, BaseTransform):
+            return TransformCompose(self, other)
 
 
 class BaseDataTransform(BaseTransform, abc.ABC):
@@ -157,3 +166,10 @@ class TransformCompose(BaseTransform):
         if not isinstance(other, TransformCompose):
             return False
         return list(other.transforms) == list(self.transforms)
+
+    def __add__(self, other):
+        """Chain transforms together by adding them."""
+        if isinstance(other, TransformCompose):
+            return TransformCompose(*self.transforms, *other.transforms)
+        if isinstance(other, BaseTransform):
+            return TransformCompose(*self.transforms, other)

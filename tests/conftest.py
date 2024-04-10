@@ -70,15 +70,10 @@ class MockTransform(BaseDataTransform):
         return 2 * x
 
 
-class MockAugmentation(BaseDataTransform):
-    def compute(self, x):
-        return x + 1
-
-
 ## Datasets
 class MockDataset(BaseDataset):
-    def __init__(self, n_samples, n_classes, transform, augmentation=None):
-        super().__init__(transform, augmentation)
+    def __init__(self, n_samples, n_classes, transform):
+        super().__init__(transform)
         self.n_samples = n_samples
         self.n_classes = n_classes
 
@@ -121,16 +116,6 @@ def mock_dataset(n_samples, n_classes):
 @pytest.fixture
 def mock_predict_dataset(n_samples):
     return MockPredictDataset(n_samples, n_classes, MockTransform())
-
-
-@pytest.fixture
-def mock_dataset_augmentation(n_samples, n_classes):
-    return MockDataset(
-        n_samples,
-        n_classes,
-        MockTransform(),
-        MockAugmentation(),
-    )
 
 
 @pytest.fixture

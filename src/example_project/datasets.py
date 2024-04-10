@@ -13,14 +13,11 @@ class TrainDataset(BaseDataset):
         self,
         data_paths: Tuple[str | Path, str | Path],
         data_slice: slice,
-        augmentation: Optional[Callable] = None,
         transform: Optional[Callable] = None,
     ):
+        super().__init__(transform)
         self.data_path, self.annotations_path = [Path(fp) for fp in data_paths]
         self.data_slice = data_slice
-
-        self.augmentation = augmentation
-        self.transform = transform
 
         image_size = 28
         num_images = 60000

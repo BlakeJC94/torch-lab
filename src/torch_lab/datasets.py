@@ -26,16 +26,13 @@ class BaseDataset(Dataset, ABC):
     def __init__(
         self,
         transform: Optional[BaseTransform | Callable] = None,
-        augmentaion: Optional[BaseTransform | Callable] = None,
     ):
         """Initialise a BaseDataset.
 
         Args:
             transform: Transform to apply to (data, metadata) tuple output of __getitem__.
-            augmentation: Another transform to apply before `transform`.
         """
         self.transform = transform
-        self.augmentation = augmentaion
 
     @abstractmethod
     def __len__(self):
@@ -70,9 +67,6 @@ class BaseDataset(Dataset, ABC):
 
     def __getitem__(self, i: int) -> Tuple[Tensor, Dict[str, Tensor]]:
         x, y = self.get_raw(i)
-
-        if self.augmentation is not None:
-            x, y = self.augmentation(x, y)
 
         if self.transform is not None:
             x, y = self.transform(x, y)
