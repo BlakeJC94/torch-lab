@@ -191,17 +191,23 @@ class MyDataset(BaseDataset):
         """Return length of dataset"""
         return ...
 
-    def get_raw_data(self, i):
-        """Return single sample of data corresponding to index `i`."""
-        return ...
-
-    def get_raw_label(self, i):
-        """(Optional) Return single label of data corresponding to index `i`."""
-        return ...
-
     def get_additional_metadata(self, i):
-        """(Optional) Return extra metadata attribure for metadata corresponding to index `i`."""
+        """(Optional) Return extra metadata attribute for metadata corresponding to index `i`."""
         return { ... }
+
+    def get_raw_label(self, metadata):
+        """(Optional) Return single label of data corresponding to metadata (contains index `i` and
+        other custom keys implemented in `get_additional_metadata`). If non-`None` result is returned,
+        label is added to metadata under key `y`. Return `None` to skip adding label.
+        """
+        return ...
+
+    def get_raw_data(self, metadata):
+        """Return single sample of data corresponding to metadata (contains index `i` and
+        other custom keys implemented in `get_additional_metadata`).
+        """
+        return ...
+
 ```
 Transforms are assigned via the `__init__` call of the `BaseDataset` class, and are computed during
 the call to `__getitem__`.

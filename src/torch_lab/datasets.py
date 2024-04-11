@@ -39,8 +39,12 @@ class BaseDataset(Dataset, ABC):
         """Return length of dataset."""
         pass
 
+    def get_additional_metadata(self, i: int) -> Dict[str, CollateData]:
+        """Add additional information to metadata."""
+        return {}
+
     @abstractmethod
-    def get_raw_data(self, i: int) -> Any:
+    def get_raw_data(self, md: Dict[str, Any]) -> Any:
         """Return raw instance of data."""
         pass
 
@@ -50,19 +54,16 @@ class BaseDataset(Dataset, ABC):
         """
         return None
 
-    def get_additional_metadata(self, i: int) -> Dict[str, CollateData]:
-        """Add additional information to metadata."""
-        return {}
-
     def get_raw(self, i: int) -> Any:
-        data = self.get_raw_data(i)
         metadata = {
+            "i": i,
             **self.get_additional_metadata(i),
-            "idx": i,
         }
-        label = self.get_raw_label(i)
-        if label is not None:
-            metadata["y"] = self.get_raw_label(i)
+
+        if (label := self.get_raw_label(metadata)) is not None:
+            metadata["y"] = label
+
+        data = self.get_raw_data(metadata)
         return data, metadata
 
     def __getitem__(self, i: int) -> Tuple[Tensor, Dict[str, Tensor]]:

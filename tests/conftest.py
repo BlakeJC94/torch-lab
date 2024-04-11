@@ -83,10 +83,12 @@ class MockDataset(BaseDataset):
     def __len__(self):
         return self.n_samples
 
-    def get_raw_data(self, i):
+    def get_raw_data(self, md):
+        i = md["i"]
         return self.data[i]
 
-    def get_raw_label(self, i):
+    def get_raw_label(self, md):
+        i = md["i"]
         return self.labels[i]
 
     def get_additional_metadata(self, i):
@@ -94,7 +96,7 @@ class MockDataset(BaseDataset):
 
 
 class MockPredictDataset(MockDataset):
-    def get_raw_label(self, i):
+    def get_raw_label(self, *_):
         return None
 
 
