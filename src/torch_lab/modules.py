@@ -78,6 +78,7 @@ class TrainLabModule(LabModule):
         - The scheduler is a callable that maps parameters to a scheduler_config (see
           https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#configure-optimizers)
     """
+
     def __init__(
         self,
         model: nn.Module,

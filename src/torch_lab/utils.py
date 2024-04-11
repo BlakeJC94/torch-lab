@@ -1,4 +1,5 @@
 """Location for common utilities used in the task scripts."""
+
 import json
 import logging
 from importlib.util import module_from_spec, spec_from_file_location

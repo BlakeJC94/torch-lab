@@ -220,7 +220,7 @@ def _train(
         trainer.validate(
             config["module"],
             dataloaders=config["val_dataloaders"],
-            **trainer_validate_kwargs
+            **trainer_validate_kwargs,
         )
         trainer.fit(
             config["module"],
@@ -254,7 +254,8 @@ def load_weights(
 ]:
     ckpt_params = hparams["checkpoint"]
     checkpoint_task_id = ckpt_params.get("checkpoint_task_id")
-    if not checkpoint_task_id: return hparams, config
+    if not checkpoint_task_id:
+        return hparams, config
 
     checkpoint_name = ckpt_params.get("checkpoint_name", "last")
     weights_only = bool(ckpt_params.get("weights_only", False))

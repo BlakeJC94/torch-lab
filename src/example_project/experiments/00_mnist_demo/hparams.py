@@ -28,4 +28,3 @@ hparams = {
         "monitor": "loss/validate",
     },
 }
-

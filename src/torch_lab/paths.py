@@ -1,4 +1,5 @@
 """Main data paths implemented as constants."""
+
 from pathlib import Path
 
 ROOT_DIR = Path(".")
