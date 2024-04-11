@@ -1,5 +1,6 @@
 """Custom types used in torch_lab."""
-from typing import TypeAlias, Dict, Optional, List, Any
+from typing import Any, Dict, List, Optional, TypeAlias
+
 from numpy import ndarray
 from torch import Tensor
 

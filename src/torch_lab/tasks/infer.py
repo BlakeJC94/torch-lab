@@ -4,7 +4,8 @@ from typing import List
 
 import pytorch_lightning as pl
 import torch
-from torch_lab.utils import compile_config, get_hparams_and_config_path, dict_as_str
+
+from torch_lab.utils import compile_config, dict_as_str, get_hparams_and_config_path
 
 logger = logging.getLogger(__name__)
 

@@ -1,20 +1,21 @@
 """Example config to define a model for MNIST digit inference."""
 
 import logging
-from pathlib import Path
 import os
 from functools import partial
+from pathlib import Path
 from typing import Any, Dict
 
 import pytorch_lightning as pl
+from torch import nn, optim
+from torch.utils.data import DataLoader
+from torchmetrics import Metric
+
 from example_project import transforms as t
 from example_project.callbacks import MnistWriter
 from example_project.datasets import PredictDataset, TrainDataset
-from torch import nn, optim
-from torch.utils.data import DataLoader
 from torch_lab.modules import LabModule, TrainLabModule
 from torch_lab.transforms import TransformCompose
-from torchmetrics import Metric
 
 logger = logging.getLogger(__name__)
 
