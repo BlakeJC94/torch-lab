@@ -51,60 +51,60 @@ class ToyModel(nn.Sequential):
 
 
 ## Common constructors
-def model_config(hparams: Dict[str, Any]) -> nn.Module:
+def model_config(config: Dict[str, Any]) -> nn.Module:
     n_channels = 1
     n_classes = 10
     return ToyModel(
         n_channels,
-        hparams["config"]["n_features"],
+        config["n_features"],
         n_classes,
     )
 
 
-def transform_config(hparams: Dict[str, Any]) -> nn.Module:
+def transform_config(config: Dict[str, Any]) -> nn.Module:
     return TransformCompose(
         t.Scale(1 / 255),
         lambda x, md: (x.astype("float32"), md),
     )
 
 
-def num_workers(hparams: Dict[str, Any]) -> int:
+def num_workers(config: Dict[str, Any]) -> int:
     return min(
-        hparams["config"].get("num_workers", os.cpu_count() or 0),
+        config.get("num_workers", os.cpu_count() or 0),
         os.cpu_count() or 0,
     )
 
 
 ## Train constructors
-def metrics(hparams: Dict[str, Any]) -> Dict[str, Metric]:
+def metrics(config: Dict[str, Any]) -> Dict[str, Metric]:
     return {
         # "mse": MeanSquaredError(),
     }
 
 
-def optimizer_factory(hparams: Dict[str, Any], *args, **kwargs) -> Any:
+def optimizer_factory(config: Dict[str, Any], *args, **kwargs) -> Any:
     return optim.AdamW(
         *args,
-        lr=hparams["config"]["learning_rate"],
-        weight_decay=hparams["config"]["weight_decay"],
+        lr=config["learning_rate"],
+        weight_decay=config["weight_decay"],
         **kwargs,
     )
 
 
-def scheduler_factory(hparams: Dict[str, Any], *args, **kwargs) -> Dict[str, Any]:
+def scheduler_factory(config: Dict[str, Any], *args, **kwargs) -> Dict[str, Any]:
     return {
         "scheduler": optim.lr_scheduler.MultiStepLR(
             *args,
-            milestones=hparams["config"]["milestones"],
-            gamma=hparams["config"]["gamma"],
+            milestones=config["milestones"],
+            gamma=config["gamma"],
             **kwargs,
         ),
-        "monitor": hparams["config"]["monitor"],
+        "monitor": config["monitor"],
     }
 
 
 ## Configs
-def train_config(hparams: Dict[str, Any]) -> Dict[str, Any]:
+def train_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Download train images with bash:
         $ wget http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz -o path/to/output
@@ -120,46 +120,46 @@ def train_config(hparams: Dict[str, Any]) -> Dict[str, Any]:
 
     train_dataset = TrainDataset(
         (
-            hparams["config"]["data"],
-            hparams["config"]["annotations"],
+            config["data"],
+            config["annotations"],
         ),
         slice(None, 48000),
-        transform=augmentation + transform_config(hparams),
+        transform=augmentation + transform_config(config),
     )
     val_dataset = TrainDataset(
         (
-            hparams["config"]["data"],
-            hparams["config"]["annotations"],
+            config["data"],
+            config["annotations"],
         ),
         slice(48000, None),
-        transform=transform_config(hparams),
+        transform=transform_config(config),
     )
 
     return dict(
         module=TrainLabModule(
-            model_config(hparams),
+            model_config(config),
             loss_function=nn.BCEWithLogitsLoss(),
-            metrics=metrics(hparams),
-            optimizer_factory=partial(optimizer_factory, hparams),
-            scheduler_factory=partial(scheduler_factory, hparams),
+            metrics=metrics(config),
+            optimizer_factory=partial(optimizer_factory, config),
+            scheduler_factory=partial(scheduler_factory, config),
         ),
         train_dataloaders=DataLoader(
             train_dataset,
-            batch_size=hparams["config"]["batch_size"],
-            num_workers=num_workers(hparams),
+            batch_size=config["batch_size"],
+            num_workers=num_workers(config),
             shuffle=True,
         ),
         val_dataloaders=DataLoader(
             val_dataset,
-            batch_size=hparams["config"]["batch_size"],
-            num_workers=num_workers(hparams),
+            batch_size=config["batch_size"],
+            num_workers=num_workers(config),
             shuffle=False,
         ),
         callbacks=[
             pl.callbacks.EarlyStopping(
-                monitor=hparams["config"]["monitor"],
+                monitor=config["monitor"],
                 min_delta=0.0001,
-                patience=hparams["config"]["patience"],
+                patience=config["patience"],
                 verbose=True,
                 mode="min",
             ),
@@ -168,7 +168,7 @@ def train_config(hparams: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def infer_config(
-    hparams: Dict[str, Any],
+    config: Dict[str, Any],
     weights_path: str,
     test_images_path: str,
 ) -> Dict[str, Any]:
@@ -185,18 +185,18 @@ def infer_config(
 
     predict_dataset = PredictDataset(
         test_images_path,
-        transform=transform_config(hparams),
+        transform=transform_config(config),
     )
 
     return dict(
         module=LabModule(
-            model_config(hparams),
+            model_config(config),
             transform=lambda y_pred, md: (y_pred.argmax(1).cpu().numpy(), md),
         ),
         predict_dataloaders=DataLoader(
             predict_dataset,
-            batch_size=hparams["config"]["batch_size"],
-            num_workers=num_workers(hparams),
+            batch_size=config["batch_size"],
+            num_workers=num_workers(config),
             shuffle=False,
         ),
         callbacks=[

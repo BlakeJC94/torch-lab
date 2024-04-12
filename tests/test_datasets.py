@@ -7,7 +7,7 @@ class TestBaseDataset:
         for i, (x, md) in enumerate(mock_dataset):
             assert (x == 2 * i * torch.ones_like(x)).all()
             assert md["i"] == i
-            assert md["y"] == i % 2
+            assert (md["y"] == i % 2).all()
             assert md["foo"] == "bar"
 
     def test_getitem_predict(self, mock_predict_dataset, n_samples):

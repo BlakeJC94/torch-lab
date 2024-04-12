@@ -76,7 +76,7 @@ can also be layered using `torch_lab.utils.import_script_as_module`.
 For training, the `__main__.py` script must define a function called `train_config` which accepts
 a single arg and returns a dictionary with the following keys:
 ```python
-def train_config(hparams):
+def train_config(config):
     ...
     return dict(
         module=...,             # torch_lab.modules.TrainLabModule
@@ -97,7 +97,7 @@ further details.
 For inference, the `__main__.py` script must define a function called `infer_config` which
 accepts at least one arg and returns a dictionary with the following keys:
 ```python
-def infer_config(hparams, ...) -> Dict[str, Any]:
+def infer_config(config, ...) -> Dict[str, Any]:
     ...
     return dict(
         module=...,               # torch_lab.modules.LabModule

@@ -108,7 +108,7 @@ def compile_config(
     config_fn = getattr(import_script_as_module(config_path), field)
 
     try:
-        config = config_fn(hparams, *config_args)
+        config = config_fn(hparams.get("config", {}), *config_args)
     except Exception as err:
         logging.getLogger(__name__).error(f"Couldn't import config: {str(err)}")
         if pdb:

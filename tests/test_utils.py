@@ -16,11 +16,11 @@ class TestCompileConfig:
     @pytest.fixture
     def mock_config(self):
         return """
-def train_config(hparams):
-    return dict(foo=2*hparams["config"]["bar"])
+def train_config(config):
+    return dict(foo=2*config["bar"])
 
-def infer_config(hparams, baz):
-    return dict(foo=2*hparams["config"]["bar"] + baz)
+def infer_config(config, baz):
+    return dict(foo=2*config["bar"] + baz)
 """
 
     @pytest.fixture

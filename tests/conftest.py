@@ -78,7 +78,7 @@ class MockDataset(BaseDataset):
         self.n_classes = n_classes
 
         self.data = [i * torch.ones((1, 10, 10)) for i in range(n_samples)]
-        self.labels = [i * torch.ones(n_classes) % 2 for i in range(n_samples)]
+        self.labels = [i * torch.ones((n_classes,)) % 2 for i in range(n_samples)]
 
     def __len__(self):
         return self.n_samples
@@ -116,7 +116,7 @@ def mock_dataset(n_samples, n_classes):
 
 
 @pytest.fixture
-def mock_predict_dataset(n_samples):
+def mock_predict_dataset(n_samples, n_classes):
     return MockPredictDataset(n_samples, n_classes, MockTransform())
 
 
