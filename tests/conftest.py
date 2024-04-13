@@ -163,7 +163,10 @@ def train_module(mock_model):
     return TrainLabModule(
         mock_model,
         loss_function=nn.BCEWithLogitsLoss(),
-        optimizer_factory=lambda params: optim.Adam(params, lr=3e-4),
+        optimizer_config={
+            "optimizer": optim.Adam,
+            "optimizer_kwargs": dict(lr=3e-4),
+        },
     )
 
 

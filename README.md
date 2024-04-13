@@ -91,8 +91,23 @@ dataloaders, and the model to be trained using python code defined within `__mai
 importing custom code from project modules. See the `src/example_project` for a worked example.
 
 The `torch_lab.module.TrainLabModule` provides a scaffold for the `torch.nn.Module` object,
-the loss function, `torchmetrics.Metrics`, the optimizer and the and scheduler. See the docs for
-further details.
+the loss function, `torchmetrics.Metrics`, the optimizer and the and scheduler.
+```python
+from torch import nn, optim
+
+module = TrainLabModule(
+    model=MyTorchModule(),                 # Subclass of torch.nn.Module
+    loss_function=nn.BCEWithLogitsLoss(),  # Callable that maps batches (y_pred, y) -> float
+    metrics={"my_metric": MyMetric(...)},  # Subclass of nn.Module with methods update(y_pred, y), compute()
+    optimizer_config={                     # Configuration of optimizer (and optional scheduler)
+        "optimizer": optim.Adam,
+        "optimizer_kwargs": dict(lr=...),
+        "scheduler": optim.lr_scheduler.MultiStepLR,
+        "scheduler_kwargs": dict(milestones=..., gamma=...),
+        "monitor": ...,
+    },
+)
+```
 
 For inference, the `__main__.py` script must define a function called `infer_config` which
 accepts at least one arg and returns a dictionary with the following keys:

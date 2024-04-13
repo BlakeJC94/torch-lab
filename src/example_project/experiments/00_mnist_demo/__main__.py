@@ -82,27 +82,6 @@ def metrics(config: Dict[str, Any]) -> Dict[str, Metric]:
     }
 
 
-def optimizer_factory(config: Dict[str, Any], *args, **kwargs) -> Any:
-    return optim.AdamW(
-        *args,
-        lr=config["learning_rate"],
-        weight_decay=config["weight_decay"],
-        **kwargs,
-    )
-
-
-def scheduler_factory(config: Dict[str, Any], *args, **kwargs) -> Dict[str, Any]:
-    return {
-        "scheduler": optim.lr_scheduler.MultiStepLR(
-            *args,
-            milestones=config["milestones"],
-            gamma=config["gamma"],
-            **kwargs,
-        ),
-        "monitor": config["monitor"],
-    }
-
-
 ## Configs
 def train_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -140,8 +119,19 @@ def train_config(config: Dict[str, Any]) -> Dict[str, Any]:
             model_config(config),
             loss_function=nn.BCEWithLogitsLoss(),
             metrics=metrics(config),
-            optimizer_factory=partial(optimizer_factory, config),
-            scheduler_factory=partial(scheduler_factory, config),
+            optimizer_config={
+                "optimizer": optim.AdamW,
+                "optimizer_kwargs": dict(
+                    lr=config["learning_rate"],
+                    weight_decay=config["weight_decay"],
+                ),
+                "scheduler": optim.lr_scheduler.MultiStepLR,
+                "scheduler_kwargs": dict(
+                    milestones=config["milestones"],
+                    gamma=config["gamma"],
+                ),
+                "monitor": config["monitor"],
+            },
         ),
         train_dataloaders=DataLoader(
             train_dataset,

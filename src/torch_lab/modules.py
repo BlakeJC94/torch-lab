@@ -83,8 +83,7 @@ class TrainLabModule(LabModule):
         self,
         model: nn.Module,
         loss_function: Callable,
-        optimizer_factory: Callable,
-        scheduler_factory: Optional[Callable] = None,
+        optimizer_config: Dict[str, Optimizer | LRScheduler | Dict[str, Any]],
         metrics: Optional[Dict[str, Metric]] = None,
         transform: Optional[Callable] = None,
     ):
@@ -93,10 +92,10 @@ class TrainLabModule(LabModule):
         Args:
             model: PyTorch module to call in the forward method.
             loss_function: Loss function to call for training and validation batches.
-            optimizer_factory: Callable that returns an optimizer to use for training. It should
-                expect a single argument, `self.parameters()`.
-            scheduler_factory: Optional callable that returns a learning rate scheduler. It should
-                expect a single argument, the registered optimizer.
+            optimizer_config: Configuration for optimiser, and also an optional scheduler. Dict must
+                have keys 'optimiser' (maps to class in torch.optim), 'optimiser_kwargs'. If
+                using a scheduler, dict should also contain 'scheduler' (maps to class in
+                torch.optim.lr_schedulers), 'scheduler_kwargs', and 'monitor'.
             metrics: A dict of {metric_name: function}. Functions should accept 2 args:
                 predictions and labels, and return a scalar number.
             transform: Transform to apply to outputs in the validation and test methods. Must take
@@ -104,8 +103,7 @@ class TrainLabModule(LabModule):
         """
         super().__init__(model, transform=transform)
         self.loss_function = loss_function
-        self.optimizer_factory = optimizer_factory
-        self.scheduler_factory = scheduler_factory
+        self.optimizer_config = optimizer_config
 
         metrics = metrics or {}
         self.metrics = nn.ModuleDict(
@@ -128,12 +126,22 @@ class TrainLabModule(LabModule):
     def configure_optimizers(self) -> Dict[str, Optimizer | LRScheduler]:
         """Return your favourite optimizer."""
         out = {}
-        if self.optimizer_factory:
-            out["optimizer"] = self.optimizer_factory(
-                filter(lambda p: p.requires_grad, self.parameters())
-            )
-        if self.scheduler_factory:
-            out["lr_scheduler"] = self.scheduler_factory(out["optimizer"])
+
+        optimizer_class = self.optimizer_config["optimizer"]
+        out["optimizer"] = optimizer_class(
+            filter(lambda p: p.requires_grad, self.parameters()),
+            **self.optimizer_config.get("optimizer_kwargs", {}),
+        )
+
+        if (scheduler_class := self.optimiser_config.get("scheduler")) is not None:
+            out["lr_scheduler"] = {
+                "scheduler": scheduler_class(
+                    out["optimizer"],
+                    **self.optimizer_config.get("scheduler_kwargs", {}),
+                ),
+                "monitor": self.optimizer_config["monitor"],
+            }
+
         return out
 
     ## Metric and loss logging methods
