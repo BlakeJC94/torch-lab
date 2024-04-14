@@ -171,9 +171,10 @@ torch==1.12.1
     # via pytorch-lightning
     # via torch-lab
     # via torchmetrics
-torchmetrics==1.3.1
+torchmetrics==1.3.2
     # via lightning
     # via pytorch-lightning
+    # via torch-lab
 tqdm==4.66.2
     # via lightning
     # via pytorch-lightning

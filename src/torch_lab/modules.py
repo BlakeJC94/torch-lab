@@ -225,6 +225,12 @@ class TrainLabModule(LabModule):
                 )
             elif isinstance(plot, tuple):
                 fig, _ax = plot
+                clearml_logger.report_matplotlib(
+                    f"{name} ({stage})",
+                    stage,
+                    iteration=self.current_epoch,
+                    figure=fig,
+                )
                 plt.close(fig)
 
     def get_stage(self) -> str:
