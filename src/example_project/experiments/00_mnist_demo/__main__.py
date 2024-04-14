@@ -51,7 +51,7 @@ class ToyModel(nn.Sequential):
 
 
 ## Common constructors
-def model_config(config: Dict[str, Any]) -> nn.Module:
+def model_config(config):
     n_channels = 1
     n_classes = 10
     return ToyModel(
@@ -61,14 +61,14 @@ def model_config(config: Dict[str, Any]) -> nn.Module:
     )
 
 
-def transform_config(config: Dict[str, Any]) -> nn.Module:
+def transform_config(config):
     return TransformCompose(
         t.Scale(1 / 255),
         lambda x, md: (x.astype("float32"), md),
     )
 
 
-def num_workers(config: Dict[str, Any]) -> int:
+def num_workers(config):
     return min(
         config.get("num_workers", os.cpu_count() or 0),
         os.cpu_count() or 0,
@@ -76,14 +76,14 @@ def num_workers(config: Dict[str, Any]) -> int:
 
 
 ## Train constructors
-def metrics(config: Dict[str, Any]) -> Dict[str, Metric]:
+def metrics(config):
     return {
         # "mse": MeanSquaredError(),
     }
 
 
 ## Configs
-def train_config(config: Dict[str, Any]) -> Dict[str, Any]:
+def train_config(config):
     """
     Download train images with bash:
         $ wget http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz -o path/to/output
@@ -157,11 +157,7 @@ def train_config(config: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
-def infer_config(
-    config: Dict[str, Any],
-    weights_path: str,
-    test_images_path: str,
-) -> Dict[str, Any]:
+def infer_config(config, weights_path, test_images_path):
     """
     Download test images with bash:
         $ wget http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz -o path/to/output
