@@ -10,6 +10,8 @@ from torch import nn
 from torch.optim import Optimizer, lr_scheduler
 from torchmetrics import Metric
 
+from torch_lab.utils import default_separate
+
 try:
     from clearml import Logger
 except ImportError:
@@ -30,6 +32,7 @@ class LabModule(pl.LightningModule):
         self,
         model: nn.Module,
         transform: Optional[Callable] = None,
+        separate_fn: Optional[Callable] = None,
     ):
         """Initialise LabModule.
 
@@ -37,10 +40,14 @@ class LabModule(pl.LightningModule):
             model: PyTorch module to call in the forward method.
             transform: Transform to apply to outputs in the predict methods. Must take
                 (data, metadata) tuple and output another (output, metadata) tuple.
+            separate_fn: Optional callable used to inverte the collate_fn operation when applying
+                transform to each sample of the batch of predictions and metadata (uses
+                torch_lab.utils.default_separate by default).
         """
         super().__init__()
         self.model = model
-        self.transform = transform or (lambda y_pred, md: (y_pred, md))
+        self.transform = transform
+        self.separate_fn = separate_fn or default_separate
 
     def forward(self, *args, **kwargs):
         return self.model(*args, **kwargs)
@@ -57,11 +64,23 @@ class LabModule(pl.LightningModule):
             key_new = f"model.{key}"
             checkpoint["state_dict"][key_new] = value
 
+    def apply_transform_to_batch(self, y_pred, md):
+        out = []
+        if self.transform is None:
+            md = self.separate_fn(md)
+        else:
+            mds = []
+            for y_pred_sample, md_sample in zip(*self.separate_fn((y_pred, md))):
+                out_sample, md_sample = self.transform(y_pred_sample, md_sample)
+                mds.append(md_sample)
+                out.append(out_sample)
+        return out, md
+
     ## Predict methods
     def predict_step(self, batch, batch_idx, _dataloader_idx=0):
         x, md = batch
         y_pred = self(x)
-        out, md = self.transform(y_pred.clone(), md)
+        out, md = self.apply_transform_to_batch(y_pred, md)
         return {"md": md, "y_pred": y_pred, "out": out}
 
 
@@ -86,6 +105,7 @@ class TrainLabModule(LabModule):
         optimizer_config: Dict[str, Optimizer | LRScheduler | Dict[str, Any]],
         metrics: Optional[Dict[str, Metric]] = None,
         transform: Optional[Callable] = None,
+        separate_fn: Optional[Callable] = None,
     ):
         """Initialise a TrainLabModule.
 
@@ -100,8 +120,11 @@ class TrainLabModule(LabModule):
                 predictions and labels, and return a scalar number.
             transform: Transform to apply to outputs in the validation and test methods. Must take
                 (data, metadata) tuple and output another (output, metadata) tuple.
+            separate_fn: Optional callable used to inverte the collate_fn operation when applying
+                transform to each sample of the batch of predictions and metadata (uses
+                torch_lab.utils.default_separate by default).
         """
-        super().__init__(model, transform=transform)
+        super().__init__(model, transform=transform, separate_fn=separate_fn)
         self.loss_function = loss_function
         self.optimizer_config = optimizer_config
 
@@ -253,7 +276,7 @@ class TrainLabModule(LabModule):
         y_pred = self(x)
         loss = self.loss_calculate_and_log(y_pred, md)
         self.metrics_update_and_log(y_pred, md)
-        out, md = self.transform(y_pred.clone(), md)
+        out, md = self.apply_transform_to_batch(y_pred, md)
         return {"loss": loss, "md": md, "y_pred": y_pred, "out": out}
 
     def on_validation_epoch_end(self):
@@ -265,7 +288,7 @@ class TrainLabModule(LabModule):
         y_pred = self(x)
         loss = self.loss_calculate_and_log(y_pred, md)
         self.metrics_update_and_log(y_pred, md)
-        out, md = self.transform(y_pred.clone(), md)
+        out, md = self.apply_transform_to_batch(y_pred, md)
         return {"loss": loss, "md": md, "y_pred": y_pred, "out": out}
 
     def on_test_epoch_end(self):
