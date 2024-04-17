@@ -252,7 +252,7 @@ def load_weights(
     Dict[str, Any],
     Dict[str, Any],
 ]:
-    ckpt_params = hparams["checkpoint"]
+    ckpt_params = hparams.get("checkpoint", {})
     checkpoint_task_id = ckpt_params.get("checkpoint_task_id")
     if not checkpoint_task_id:
         return hparams, config
