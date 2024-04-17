@@ -77,6 +77,10 @@ def set_hparams_debug_overrides(hparams: JsonDict, dev_run: str) -> JsonDict:
     # Config overrides
     hparams["config"]["num_workers"] = 0
     # Trainer overrides
+    if "trainer" not in hparams:
+        hparams["trainer"] = {}
+    if "init" not in hparams["trainer"]:
+        hparams["trainer"]["init"] = {}
     hparams["trainer"]["init"]["log_every_n_steps"] = 1
     hparams["trainer"]["init"]["overfit_batches"] = (
         float(dev_run) if "." in dev_run else int(dev_run)
