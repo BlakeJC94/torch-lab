@@ -31,8 +31,10 @@ class ClearMlLogger(TensorBoardLogger):
 
         task = self.setup_task(hparams, config_path, task_name)
 
+        save_dir = root_dir / f"{get_task_dir_name(task)}/logs"
+        save_dir.mkdir(parents=True, exist_ok=True)
         super().__init__(
-            save_dir=str(root_dir / f"{get_task_dir_name(task)}/logs"),
+            save_dir=str(save_dir),
             name="",
             version=None,
             log_graph=False,
