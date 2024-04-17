@@ -95,7 +95,7 @@ class ClearMlLogger(TensorBoardLogger):
         }
         task = Task.init(**task_init_kwargs)
 
-        ckpt_params = hparams["checkpoint"]
+        ckpt_params = hparams.get("checkpoint", {})
         checkpoint_task_id = ckpt_params.get("checkpoint_task_id")
         if checkpoint_task_id:
             task.set_parent(checkpoint_task_id)
