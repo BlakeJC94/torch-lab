@@ -104,8 +104,3 @@ class ClearMlLogger(TensorBoardLogger):
         task.connect_configuration(config_path, "config")
         task.connect(hparams, "hparams")
         return task
-
-    @rank_zero_only
-    def finalize(self, status):
-        self.task.close()
-        super().finalize(status)

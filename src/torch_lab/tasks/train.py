@@ -18,7 +18,7 @@ import pytorch_lightning as pl
 import torch
 from clearml import Model, Task
 
-from torch_lab.callbacks import ClearMLModelCheckpoint, EpochProgress, NanMonitor
+from torch_lab.callbacks import ClearMLModelCheckpoint, ClearMLTaskMarker, EpochProgress, NanMonitor
 from torch_lab.loggers import ClearMlLogger
 from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
 from torch_lab.utils import compile_config, dict_as_str, get_hparams_and_config_path
@@ -185,6 +185,7 @@ def _train(
                 monitor=hparams["config"]["monitor"],
                 save_last=True,
             ),
+            ClearMLTaskMarker(),
             *callbacks,
         ]
 

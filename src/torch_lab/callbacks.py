@@ -138,3 +138,15 @@ class ClearMLModelCheckpoint(pl.callbacks.ModelCheckpoint):
                     self.upload_weights_to_task(task, trainer, filepath)
                 except Exception as err:
                     logger.error(f"Couldn't upload '{filepath}': {str(err)}")
+
+
+class ClearMLTaskMarker(pl.callbacks.Callback):
+    def on_fit_end(self, trainer, pl_module):
+        task = getattr(trainer.logger, "task", None)
+        if task is not None:
+            task.mark_completed()
+
+    def on_exception(self, trainer, pl_module, exception):
+        task = getattr(trainer.logger, "task", None)
+        if task is not None:
+            task.mark_failed()
