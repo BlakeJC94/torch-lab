@@ -93,9 +93,14 @@ class TrainLabModule(LabModule):
 
     Training-specific attributes are implemented in this variant:
         - The loss function is a callable that maps batches (y_pred, y) to a float
-        - The optimiser is a callable that maps parameters to a torch.optim
-        - The scheduler is a callable that maps parameters to a scheduler_config (see
-          https://lightning.ai/docs/pytorch/stable/common/lightning_module.html#configure-optimizers)
+        - The optimizer config is a dict the following keys:
+            - "optimizer" (type from torch.optim)
+            - "optimizer_kwargs" (optional, dict),
+            - "scheduler" (optional, type from torch.optim.lr_scheduler)
+            - "scheduler_kwargs" (optional, dict),
+            - "monitor": (optional, str)
+        - The metrics are passed as a dict mapping names to nn.Modules with an update/compute
+              methods (e.g. torchmetrics).
     """
 
     def __init__(
@@ -112,8 +117,8 @@ class TrainLabModule(LabModule):
         Args:
             model: PyTorch module to call in the forward method.
             loss_function: Loss function to call for training and validation batches.
-            optimizer_config: Configuration for optimiser, and also an optional scheduler. Dict must
-                have keys 'optimiser' (maps to class in torch.optim), 'optimiser_kwargs'. If
+            optimizer_config: Configuration for optimizer, and also an optional scheduler. Dict must
+                have keys 'optimizer' (maps to class in torch.optim), 'optimizer_kwargs'. If
                 using a scheduler, dict should also contain 'scheduler' (maps to class in
                 torch.optim.lr_schedulers), 'scheduler_kwargs', and 'monitor'.
             metrics: A dict of {metric_name: function}. Functions should accept 2 args:
@@ -156,7 +161,7 @@ class TrainLabModule(LabModule):
             **self.optimizer_config.get("optimizer_kwargs", {}),
         )
 
-        if (scheduler_class := self.optimiser_config.get("scheduler")) is not None:
+        if (scheduler_class := self.optimizer_config.get("scheduler")) is not None:
             out["lr_scheduler"] = {
                 "scheduler": scheduler_class(
                     out["optimizer"],
