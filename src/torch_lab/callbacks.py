@@ -51,7 +51,7 @@ class NanMonitor(pl.Callback):
             "y": batch[1]["y"],
             "y_pred": outputs.get("y_pred"),
             "loss": outputs.get("loss"),
-            "out": outputs.get("out"),
+            # "out": outputs.get("out"),  # TODO find a way to handle lists
         }
         for k, v in to_check.items():
             if v is None:
