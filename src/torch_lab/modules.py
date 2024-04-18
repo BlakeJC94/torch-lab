@@ -10,8 +10,6 @@ from torch import nn
 from torch.optim import Optimizer, lr_scheduler
 from torchmetrics import Metric
 
-from torch_lab.utils import default_separate
-
 try:
     from clearml import Logger
 except ImportError:
@@ -31,23 +29,19 @@ class LabModule(pl.LightningModule):
     def __init__(
         self,
         model: nn.Module,
-        transform: Optional[Callable] = None,
-        separate_fn: Optional[Callable] = None,
+        output_transform: Optional[Callable] = None,
     ):
         """Initialise LabModule.
 
         Args:
             model: PyTorch module to call in the forward method.
-            transform: Transform to apply to outputs in the predict methods. Must take
-                (data, metadata) tuple and output another (output, metadata) tuple.
-            separate_fn: Optional callable used to inverte the collate_fn operation when applying
-                transform to each sample of the batch of predictions and metadata (uses
-                torch_lab.utils.default_separate by default).
+            output_transform: Transform to apply to outputs in the predict methods. Must take
+                (data_batch, metadata_batch) tuple and output another (output_batch, metadata_batch)
+                tuple.
         """
         super().__init__()
         self.model = model
-        self.transform = transform
-        self.separate_fn = separate_fn or default_separate
+        self.output_transform = output_transform
 
     def forward(self, *args, **kwargs):
         return self.model(*args, **kwargs)
@@ -65,15 +59,9 @@ class LabModule(pl.LightningModule):
             checkpoint["state_dict"][key_new] = value
 
     def apply_transform_to_batch(self, y_pred, md):
-        out = []
-        if self.transform is None:
-            md = self.separate_fn(md)
-        else:
-            mds = []
-            for y_pred_sample, md_sample in zip(*self.separate_fn((y_pred, md))):
-                out_sample, md_sample = self.transform(y_pred_sample, md_sample)
-                mds.append(md_sample)
-                out.append(out_sample)
+        out = None
+        if self.output_transform is not None:
+            out, md = self.output_transform(y_pred, md)
         return out, md
 
     ## Predict methods
@@ -109,8 +97,7 @@ class TrainLabModule(LabModule):
         loss_function: Callable,
         optimizer_config: Dict[str, Optimizer | LRScheduler | Dict[str, Any]],
         metrics: Optional[Dict[str, Metric]] = None,
-        transform: Optional[Callable] = None,
-        separate_fn: Optional[Callable] = None,
+        output_transform: Optional[Callable] = None,
     ):
         """Initialise a TrainLabModule.
 
@@ -123,13 +110,11 @@ class TrainLabModule(LabModule):
                 torch.optim.lr_schedulers), 'scheduler_kwargs', and 'monitor'.
             metrics: A dict of {metric_name: function}. Functions should accept 2 args:
                 predictions and labels, and return a scalar number.
-            transform: Transform to apply to outputs in the validation and test methods. Must take
-                (data, metadata) tuple and output another (output, metadata) tuple.
-            separate_fn: Optional callable used to inverte the collate_fn operation when applying
-                transform to each sample of the batch of predictions and metadata (uses
-                torch_lab.utils.default_separate by default).
+            output_transform: Transform to apply to outputs in the validation and test methods.
+                Must take (data_batch, metadata_batch) tuple and output another (output_batch,
+                metadata_batch) tuple.
         """
-        super().__init__(model, transform=transform, separate_fn=separate_fn)
+        super().__init__(model, output_transform=output_transform)
         self.loss_function = loss_function
         self.optimizer_config = optimizer_config
 
@@ -192,13 +177,12 @@ class TrainLabModule(LabModule):
     @torch.no_grad()
     def metrics_update_and_log(self, y_pred: Any, md: Any) -> None:
         """Calculate and log metrics for a batch of predictions against target labels."""
-        y = md["y"]
         stage = self.get_stage()
 
         metrics = getattr(self.metrics, f"{stage}_metrics", {})
         for metric_name, metric in metrics.items():
             try:
-                metric.update(y_pred, y)
+                metric.update(y_pred, md)
             except Exception as err:
                 raise ValueError(
                     f"Error when updating metric '{metric_name}': {str(err)}"

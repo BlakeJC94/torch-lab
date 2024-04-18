@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from torch import nn
 
 from torch_lab.typing import CollateData
+from torch_lab.utils import default_separate
 
 
 class BaseTransform(nn.Module, abc.ABC):
@@ -173,3 +174,34 @@ class TransformCompose(BaseTransform):
             return TransformCompose(*self.transforms, *other.transforms)
         if isinstance(other, BaseTransform):
             return TransformCompose(*self.transforms, other)
+
+
+class TransformSeperate(BaseTransform):
+    """Separate a batch into list of samples (inverse of collate_fn) before applying wrapped
+    transform.
+    """
+
+    def __init__(
+        self,
+        transform: BaseTransform | Callable,
+        separate_fn: Optional[Callable] = None,
+    ):
+        """Initialise TransformSeperate.
+
+        Args:
+            transform: Transform to apply to each sample in the batch.
+            separate_fn: Optional callable used to invert the collate_fn operation when applying
+                transform to each sample of the batch of predictions and metadata (uses
+                torch_lab.utils.default_separate by default).
+        """
+        super().__init__()
+        self.transform = transform
+        self.separate_fn = separate_fn or default_separate
+
+    def compute(self, x, md):
+        x_out, md_out = [], []
+        for x_sample, md_sample in zip(*self.separate_fn((x, md))):
+            x_out_sample, md_out_sample = self.transform(x_sample, md_sample)
+            x_out.append(x_out_sample)
+            md_out.append(md_out_sample)
+        return x_out, md_out
