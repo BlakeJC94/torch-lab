@@ -104,8 +104,8 @@ class ClearMLModelCheckpoint(pl.callbacks.ModelCheckpoint):
     def upload_weights_to_task(task, trainer, filepath):
         metrics = {
             "time": time.time(),
-            "epoch": trainer.current_epoch
-            ** {k: v.cpu().item() for k, v in trainer.callback_metrics.items()},
+            "epoch": trainer.current_epoch,
+            **{k: v.cpu().item() for k, v in trainer.callback_metrics.items()},
         }
 
         output_model = OutputModel(
