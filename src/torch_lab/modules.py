@@ -178,12 +178,13 @@ class TrainLabModule(LabModule):
     @torch.no_grad()
     def metrics_update_and_log(self, y_pred: Any, md: Any) -> None:
         """Calculate and log metrics for a batch of predictions against target labels."""
+        y = md["y"]
         stage = self.get_stage()
 
         metrics = getattr(self.metrics, f"{stage}_metrics", {})
         for metric_name, metric in metrics.items():
             try:
-                metric.update(y_pred, md)
+                metric.update(y_pred, y)
             except Exception as err:
                 raise ValueError(
                     f"Error when updating metric '{metric_name}': {str(err)}"
