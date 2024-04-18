@@ -133,6 +133,7 @@ class TrainLabModule(LabModule):
                 "scheduler_factory",
                 "metrics",
                 "model",
+                "output_transform",
             ],
         )
 
