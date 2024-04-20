@@ -190,7 +190,7 @@ def _train(
         ]
 
     # Initialise trainer and kwargs
-    trainer_fit_kwargs = hparams["trainer"].get("fit", {})
+    trainer_fit_kwargs = hparams.get("trainer", {}).get("fit", {})
     trainer_init_kwargs = {
         "logger": exp_logger,
         "accelerator": "gpu" if torch.cuda.is_available() else "cpu",
@@ -203,7 +203,7 @@ def _train(
         "num_sanity_val_steps": 0,
         "enable_progress_bar": False,
         "max_epochs": -1,
-        **hparams["trainer"].get("init", {}),
+        **hparams.get("trainer", {}).get("init", {}),
     }
     trainer = pl.Trainer(**trainer_init_kwargs)
 
