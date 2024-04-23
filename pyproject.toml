@@ -1,6 +1,6 @@
 [project]
 name = "torch-lab"
-version = "1.7.6"
+version = "1.7.7"
 description = "Core components for experiments with Pytorch"
 authors = [
     { name = "BlakeJC94", email = "blakejamescook@gmail.com" }

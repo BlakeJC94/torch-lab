@@ -98,7 +98,11 @@ class ClearMLModelCheckpoint(pl.callbacks.ModelCheckpoint):
         super()._save_checkpoint(trainer, filepath)
         task = Task.current_task()
         if task:
-            self.upload_weights_to_task(task, trainer, filepath)
+            name = {
+                str(self.best_model_path): "best",
+                str(self.last_model_path): "last",
+            }.get(str(filepath))
+            self.upload_weights_to_task(task, trainer, filepath, name)
 
     @staticmethod
     def upload_weights_to_task(task, trainer, filepath, name):
