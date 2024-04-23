@@ -147,9 +147,15 @@ class ClearMLTaskMarker(pl.callbacks.Callback):
     def on_fit_end(self, trainer, pl_module):
         task = getattr(trainer.logger, "task", None)
         if task is not None:
+            logger.info(
+                "Finished fitting process, closing ClearML task with completed status"
+            )
             task.mark_completed()
 
     def on_exception(self, trainer, pl_module, exception):
         task = getattr(trainer.logger, "task", None)
         if task is not None:
+            logger.error(
+                f"Encountered '{str(exception)}', closing ClearML task with fail status"
+            )
             task.mark_failed()
