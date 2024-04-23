@@ -120,7 +120,8 @@ class ClearMLModelCheckpoint(pl.callbacks.ModelCheckpoint):
         output_model.connect(task=task)
 
         output_model.update_weights(
-            weights_filename=name,
+            weights_filename=filepath,
+            target_filename=name,
             iteration=trainer.global_step,
             auto_delete_file=False,
         )
