@@ -177,7 +177,7 @@ def infer_config(config, weights_path, test_images_path):
     return dict(
         module=LabModule(
             model_config(config),
-            transform=lambda y_pred, md: (y_pred.argmax(1).cpu().numpy(), md),
+            output_transform=lambda y_pred, md: (y_pred.argmax(1).cpu().numpy(), md),
         ),
         predict_dataloaders=DataLoader(
             predict_dataset,
