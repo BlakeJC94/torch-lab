@@ -10,6 +10,7 @@ import argparse
 import concurrent.futures as cf
 import logging
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -17,7 +18,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import pytorch_lightning as pl
 import torch
 from clearml import Model, Task
-
 from torch_lab.callbacks import ClearMLModelCheckpoint, ClearMLTaskMarker, EpochProgress, NanMonitor
 from torch_lab.loggers import ClearMlLogger
 from torch_lab.paths import ARTIFACTS_DIR, get_task_dir_name
@@ -145,18 +145,24 @@ def _train(
     hparams, config_path = get_hparams_and_config_path(hparams_path, dev_run)
 
     # Initialise logger
+    task_name = get_task_name(
+        hparams_path,
+        dev_run=dev_run,
+        offline=offline,
+        project_name=hparams.get("task", {}).get("project_name", "unnamed"),
+    )
+    save_dir = ARTIFACTS_DIR / task_name
     if not offline:
         exp_logger = ClearMlLogger(
             hparams=hparams,
             config_path=config_path,
-            task_name=get_task_name(hparams_path, dev_run),
-            root_dir=ARTIFACTS_DIR,
+            save_dir=save_dir,
         )
-        task_dir_name = get_task_dir_name(exp_logger.task)
+        save_dir = exp_logger.save_dir  # Get updated save_dir w/ task id
     else:
-        task_dir_name = f"{get_task_name(hparams_path, dev_run)}-offline"
+        save_dir.mkdir(parents=True, exist_ok=True)
         exp_logger = pl.loggers.TensorBoardLogger(
-            save_dir=str(ARTIFACTS_DIR / f"{task_dir_name}/logs"),
+            save_dir=save_dir,
             name="",
             default_hp_metric=False,
         )
@@ -174,20 +180,9 @@ def _train(
     callbacks = [
         EpochProgress(),
         NanMonitor(),
-        pl.callbacks.LearningRateMonitor(),
+        ClearMLTaskMarker(),
         *config.get("callbacks", []),
     ]
-    if not dev_run:
-        save_dir = ARTIFACTS_DIR / f"{task_dir_name}"
-        callbacks = [
-            ClearMLModelCheckpoint(
-                save_dir / "model_weights",
-                monitor=hparams["config"]["monitor"],
-                save_last=True,
-            ),
-            ClearMLTaskMarker(),
-            *callbacks,
-        ]
 
     # Initialise trainer and kwargs
     trainer_fit_kwargs = hparams.get("trainer", {}).get("fit", {})
@@ -204,6 +199,7 @@ def _train(
         "enable_progress_bar": False,
         "max_epochs": -1,
         **hparams.get("trainer", {}).get("init", {}),
+        "default_root_dir": save_dir,
     }
     trainer = pl.Trainer(**trainer_init_kwargs)
 
@@ -239,11 +235,40 @@ def _train(
         raise err
 
 
-def get_task_name(hparams_path: Path, dev_run: bool):
-    task_name = "-".join(Path(hparams_path).parts[-2:]).removesuffix(".py")
+def get_task_name(hparams_path: Path, dev_run: bool, offline: bool, project_name: str):
+    task_base_name = hparams_path.parts[-2]
+    task_stem_name = hparams_path.parts[-1].removesuffix(".py")
+
     if dev_run:
-        task_name = f"dev_{task_name}"
-    return task_name
+        task_base_name = f"dev_{task_base_name}"
+
+    for k, v in {
+        "project name": project_name,
+        "task base name": task_base_name,
+        "task stem name": task_stem_name,
+    }.items():
+        if "-" in v:
+            raise ValueError(f"The character '-' is forbidden in the {k} ('{v}')")
+
+    if offline:
+        task_version_name = "offline"
+    else:
+        prev_tasks = Task.get_tasks(
+            project_name=project_name,
+            task_name=f"^{task_base_name}-{task_stem_name}",
+        )
+        max_task_v = -1
+        for t in prev_tasks:
+            version_suffix = t.name.split("-", 2)[-1]
+            version_search = re.search(r"\d+", version_suffix)
+            if version_search is None:
+                continue
+            version = int(version_search.group(0))
+            max_task_v = max(max_task_v, version)
+        task_version_name = "v" + str(max_task_v + 1)
+
+    task_stem_name = f"{task_stem_name}_{task_version_name}"
+    return "-".join([task_base_name, task_stem_name])
 
 
 def load_weights(

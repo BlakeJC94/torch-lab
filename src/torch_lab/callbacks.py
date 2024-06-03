@@ -98,10 +98,14 @@ class ClearMLModelCheckpoint(pl.callbacks.ModelCheckpoint):
         super()._save_checkpoint(trainer, filepath)
         task = Task.current_task()
         if task:
-            self.upload_weights_to_task(task, trainer, filepath)
+            name = {
+                str(self.best_model_path): "best",
+                str(self.last_model_path): "last",
+            }.get(str(filepath))
+            self.upload_weights_to_task(task, trainer, filepath, name)
 
     @staticmethod
-    def upload_weights_to_task(task, trainer, filepath):
+    def upload_weights_to_task(task, trainer, filepath, name):
         metrics = {
             "time": time.time(),
             "epoch": trainer.current_epoch,
@@ -116,7 +120,8 @@ class ClearMLModelCheckpoint(pl.callbacks.ModelCheckpoint):
         output_model.connect(task=task)
 
         output_model.update_weights(
-            weights_filename=str(filepath),
+            weights_filename=filepath,
+            target_filename=name,
             iteration=trainer.global_step,
             auto_delete_file=False,
         )
@@ -132,10 +137,13 @@ class ClearMLModelCheckpoint(pl.callbacks.ModelCheckpoint):
             logger.info("No active ClearML task detected, exiting.")
             return
 
-        for filepath in [self.best_model_path, self.last_model_path]:
+        for name, filepath in [
+            ("best", self.best_model_path),
+            ("last", self.last_model_path),
+        ]:
             if Path(filepath).is_file():
                 try:
-                    self.upload_weights_to_task(task, trainer, filepath)
+                    self.upload_weights_to_task(task, trainer, filepath, name)
                 except Exception as err:
                     logger.error(f"Couldn't upload '{filepath}': {str(err)}")
 
@@ -144,9 +152,15 @@ class ClearMLTaskMarker(pl.callbacks.Callback):
     def on_fit_end(self, trainer, pl_module):
         task = getattr(trainer.logger, "task", None)
         if task is not None:
+            logger.info(
+                "Finished fitting process, closing ClearML task with completed status"
+            )
             task.mark_completed()
 
     def on_exception(self, trainer, pl_module, exception):
         task = getattr(trainer.logger, "task", None)
         if task is not None:
+            logger.error(
+                f"Encountered '{str(exception)}', closing ClearML task with fail status"
+            )
             task.mark_failed()

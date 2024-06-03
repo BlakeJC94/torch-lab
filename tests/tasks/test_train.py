@@ -61,7 +61,7 @@ class TestTrain:
                 reuse_last_task_id=False,
                 auto_connect_frameworks=ANY,
                 project_name="test",
-                task_name="00_mnist_demo-hparams-v0",
+                task_name="00_mnist_demo-hparams_v0",
             ),
             call().connect_configuration(hparams_path.parent / "__main__.py", "config"),
             call().connect(import_script_as_module(hparams_path).hparams, "hparams"),
@@ -75,6 +75,7 @@ class TestTrain:
                 num_sanity_val_steps=0,
                 enable_progress_bar=True,
                 max_epochs=-1,
+                default_root_dir=ANY,
             ),
             call().validate(ANY, dataloaders=ANY),
             call().fit(
@@ -105,6 +106,7 @@ class TestTrain:
                 num_sanity_val_steps=0,
                 enable_progress_bar=True,
                 max_epochs=-1,
+                default_root_dir=ANY,
             ),
             call().validate(ANY, dataloaders=ANY),
             call().fit(
@@ -132,7 +134,7 @@ class TestTrain:
             reuse_last_task_id=False,
             auto_connect_frameworks=ANY,
             project_name="test",
-            task_name="dev_00_mnist_demo-hparams-v0",
+            task_name="dev_00_mnist_demo-hparams_v0",
         )
         assert mock_trainer.mock_calls[0] == call(
             logger=ANY,
@@ -144,6 +146,7 @@ class TestTrain:
             max_epochs=-1,
             log_every_n_steps=1,
             overfit_batches=float(dev_run) if "." in dev_run else int(dev_run),
+            default_root_dir=ANY,
         )
 
     def test_raise_train_dev_mode_multi(
@@ -186,6 +189,7 @@ class TestTrain:
                 num_sanity_val_steps=0,
                 enable_progress_bar=True,
                 max_epochs=-1,
+                default_root_dir=ANY,
             ),
             call().validate(ANY, dataloaders=ANY, ckpt_path=ANY),
             call().fit(
@@ -227,6 +231,7 @@ class TestTrain:
                 num_sanity_val_steps=0,
                 enable_progress_bar=True,
                 max_epochs=-1,
+                default_root_dir=ANY,
             ),
             call().validate(ANY, dataloaders=ANY),
             call().fit(
