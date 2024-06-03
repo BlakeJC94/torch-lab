@@ -140,7 +140,7 @@ class TransformCompose(BaseTransform):
         for t in transforms:
             if not callable(t):
                 raise ValueError("TransformCompose must be initialised with callables.")
-        self.transforms = transforms
+        self.transforms = nn.ModuleList(transforms)
 
     def compute(self, x, md):
         """Apply transforms in sequence, and raise any exception that occurs."""
@@ -162,6 +162,9 @@ class TransformCompose(BaseTransform):
         if isinstance(transforms, (tuple, list)):
             return TransformCompose(*transforms)
         return transforms
+
+    def __hash__(self):
+        return super().__hash__()
 
     def __eq__(self, other):
         if not isinstance(other, TransformCompose):
